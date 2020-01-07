@@ -25,3 +25,12 @@ UL = mean(xdf$Adj.Close) + MOE
 #We are 95% confidence that the mean bond rate is contained in the interval
 LL
 UL
+
+plot.ts(xdf$Adj.Close, col = "blue",lwd=2,lty=1, main="TIME SERIES PLOT OF bond data",cex.main=1)
+
+#Augmented Dickey-Fuller Test
+adf.test(xdf$Adj.Close)
+
+acf(xdf$Adj.Close)
+acf(xdf$Adj.Close[1:750])
+acf(xdf$Adj.Close[751:1509])
