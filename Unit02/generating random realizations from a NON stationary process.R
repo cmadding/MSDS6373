@@ -1,0 +1,10 @@
+#install.packages(tswge)
+library(tswge)
+#Code for generating random realizations from a NON stationary process
+Xt1 = gen.sigplusnoise.wge(n = 1000,freq=c(.005,0),psi = c(runif(1,0,2*pi),0),vara = .00, coef = c(1,0),plot = TRUE)
+Xt2 = gen.sigplusnoise.wge(n = 1000,freq=c(.005,0),psi = c(runif(1,0,2*pi),0),vara = .00, coef = c(1,0),plot = TRUE)
+Xt3 = gen.sigplusnoise.wge(n = 1000,freq=c(.005,0),psi = c(runif(1,0,2*pi),0),vara = .00, coef = c(1,0),plot = TRUE)
+par(mfrow = c(3,1))
+plot(seq(0,1000,length = 1000),Xt1,main = "Realization 1 (Seed = 1): cos(t + 0)",type = "l",xlab = "",ylab = "", cex.axis = 1.5)
+plot(seq(0,1000,length = 1000),Xt2,main = "Realization 2 (Seed = 2): cos(t + 0)",type = "l",xlab = "",ylab = "", cex.axis = 1.5)
+plot(seq(0,1000,length = 1000),Xt3,main = "Realization 3 (Seed = 3): cos(t + 0)",type = "l",xlab = "",ylab = "", cex.axis = 1.5)
