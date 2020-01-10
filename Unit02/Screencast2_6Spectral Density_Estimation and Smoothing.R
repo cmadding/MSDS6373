@@ -1,0 +1,20 @@
+#2.6 Spectral Density: Estimation and Smoothing
+library(tswge)
+
+data(patemp)
+parzen.wge(patemp)
+data(airlog)
+parzen.wge(airlog)
+parzen.wge(airlog,trunc = 70)
+data(bat)
+parzen.wge(bat)
+data(sunspot.classic)
+parzen.wge(sunspot.classic)
+plotts.sample.wge(patemp)
+plotts.sample.wge(airlog)
+plotts.sample.wge(bat)
+plotts.sample.wge(sunspot.classic)
+#ICC: Estimate the frequency in the Canadian lynx data
+data(llynx)
+parzen.wge(llynx)
+plotts.sample.wge(llynx)
