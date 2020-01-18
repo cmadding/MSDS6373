@@ -14,7 +14,7 @@ library(xtable)
 library(tseries)
 
 
-#Average Monthly Temperatures at Nottingham, 1920–1939
+#Average Monthly Temperatures at Nottingham, 1920-1939
 data(nottem)
 ts(nottem, start=c(1920, 1), end=c(1939, 12), frequency=12)
 start(nottem)
@@ -24,7 +24,7 @@ dim(nottem)
 names(nottem)
 summary(nottem)
 
-plot(nottem,type = "b",main = "Average Monthly Temperatures at Nottingham, 1920–1939", ylab="Air Temperature (Degrees Fahrenheit)", xlab="Month/Year")
+plot(nottem,type = "b",main = "Average Monthly Temperatures at Nottingham, 1920-1939", ylab="Air Temperature (Degrees Fahrenheit)", xlab="Month/Year")
 abline(reg=lm(nottem~time(nottem)))
 
 nott <- window(nottem, end = c(1936,12))
@@ -63,6 +63,18 @@ pacf(nottem, main="PACF of Nottingham")
 pacf(nottemtimeseries, lag.max=20) # plot a correlogram
 pacf(nottemtimeseries, lag.max=20, plot=FALSE)
 
-#Augmented Dickey-Fuller Test
+#Augmented Dickey-Fuller (ADF) t-statistic test for unit root
+#Another test we can conduct is the Augmented Dickey-Fuller (ADF)
+#t-statistic test to find if the series has a unit root
+#(a series with a trend line will have a unit root and result in a large p-value).
+
 adf.test(nottem)
+
+#Kwiatkowski-Phillips-Schmidt-Shin (KPSS) for level or trend stationarity
+#We can test if the time series is level or trend stationary using the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test.
+#Here we will test the null hypothesis of trend stationarity
+#(a low p-value will indicate a signal that is not trend stationary, has a unit root):
+
+kpss.test(nottem, null="Trend")
+
 
