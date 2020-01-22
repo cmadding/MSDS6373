@@ -4,6 +4,7 @@ library(tswge)
 library(tseries)
 library(stats)
 
+
 #Walmart Store 8Item 1 Filtering / spectral analysis / AR(3)
 # Read in the data
 Walmart = read.csv("Data/Walmart.csv",header = TRUE)
@@ -59,7 +60,7 @@ ma5 = stats::filter(Stor8Item1_grouped$mean_sales,rep(1,5))/5
 ma5 = na.remove(ma5)
 
 #Plot the Low Pass 5 Point Moving Average
-plot(ma5,type = 'l')
+graphics::plot(ma5,type = 'l')
 parzen.wge(ma5)
 plotts.sample.wge(ma5)
 
@@ -71,6 +72,10 @@ ma51 = na.remove(ma51)
 plot(ma51,type = 'l')
 parzen.wge(ma51)
 plotts.sample.wge(ma51)
+
+#Moving Average using the ZOO package
+library(zoo)
+ZOOma51 = rollmean(Stor8Item1_grouped$mean_sales, k = 51, fill = NA)
 
 #Create a test set
 Stor8Item1_season = ts(Stor8Item1_grouped$mean_sales,  frequency = 12)

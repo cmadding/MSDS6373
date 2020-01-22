@@ -1,0 +1,140 @@
+---
+title: "Problem 2.1 and 2.3"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+Load the tswge library
+```{r}
+library(tswge)
+```
+
+2.1 Generate a realization of length n = 100 from the signal-plus-noise model in Problem 1.6
+```{r}
+x=gen.sigplusnoise.wge(100,b0=0,b1=0,coef=c(3,1.5),freq = c(.05,.35),psi = c(0,2))
+```
+
+a. Apply a third-order low-pass Butterworth filter to the original realization with cutoff point 0.2.
+```{r}
+xl2=butterworth.wge(x,order=3,type = 'low',cutoff = .2)
+```
+
+b. Apply a third-order high-pass Butterworth filter to the original realization with cutoff point 0.2.
+```{r}
+xh2=butterworth.wge(x,order=3,type = 'high',cutoff = .2)
+```
+
+c. Apply a third-order low-pass Butterworth filter with cutoff point 0.2 to the high-pass filtered realization in (b).
+```{r}
+xhl2=butterworth.wge(xh2$x.filt,order=3,type = 'low',cutoff = .2)
+```
+
+For the original data and the three filtered realizations obtained in (a-c) earlier, plot the following:
+i. The realization
+ii. The sample autocorrelations
+iii. The Parzen window-based spectral density estimate using the default truncation point
+
+Discuss the cyclic behavior in the original data along with that for (a-c) and discuss the effect of the filters applied.
+
+```{r}
+#Original Dataset
+plotts.sample.wge(x)
+```
+This signal is characterized by cyclic behavior (with period about 20) along with a high-frequency component.
+The sample autocorrelations primarily show the cyclic behavior with period about 20 but may be affected slightly by the high-frequency behavior. The Parzen window (and periodogram) show two peaks at about .05 and .35.
+
+```{r}
+#Low-pass filter
+plotts.sample.wge(xl2$x.filt)
+```
+This signal is characterized by a smooth cyclic behavior (with period about 20) with the high-frequency component removed.
+The sample autocorrelations primarily show the cyclic behavior with period about 20 but may be affected slightly by the high-frequency behavior. The Parzen window (and periodogram) show a peak at about .05.
+
+```{r}
+#high-pass filter
+plotts.sample.wge(xh2$x.filt)
+```
+This signal is characterized by a high-frequency (nearly up-and-down) behavior.
+The sample autocorrelations clearly show the cyclic behavior with period about 3. The Parzen window (and periodogram) show a peak at about .35.
+
+```{r}
+#low-pass filtering the high-pass data
+plotts.sample.wge(xhl2$x.filt)
+```
+This signal is very weak. Whereas the original signal went from -6 to 6, the low-pass data went from -4 to 4 and the high-pass data had range -2 to 2, the double filtered data set goes from about -0.4 to 0.4. It would be clearer if all plots were plotted on the same scale. While we might have thought the double-filtered data would be essentially white noise, there does seem to be some periodic behavior with period about 4-5 as characterized by the data, sample autocorrelations and spectrum.
+
+
+###Additional Problem
+Apply a 5-point moving average to the series you created in 2.1.
+How does it compare to the difference and Butterworth filters?
+Specifically, is it a low pass or high pass filter?
+
+```{r}
+#Apply a 5-point moving average to the series you created in 2.1
+ma = filter(x,rep(1/5,5))
+plot(ma)
+```
+The 5 point moving average filter is a low pass filter, the effects of which can be viewed above. While there is still possibly some remnants of the higher frequency, it is the low frequency that dominates the filtered realization. It is most comparable to a Butterworth low pass filter with cutoff of .2 although this MA filter does not appear to filter out the higher frequency as well. This is partially because the order of the Butterworth filter was set to 3.
+
+##Problem 2.3
+
+Using the signal-plus-noise realization generated for Problem 2.1, difference the data. That is, compute the realization of length 99 given by yt=xt-xt-1, where xt denotes the original realization. Plot the following:
+a. The differenced data (i.e., y t )
+b. The sample autocorrelations
+c. The Parzen window-based spectral density estimate using the default truncation point
+
+Discuss the effect of the differencing. What type of filter (high pass or low pass) is the difference? How does it compare with the high-pass Butterworth filter for filtering out the frequency 0.05?
+
+```{r differencing}
+xdif=artrans.wge(x,phi.tr=1) #For a difference, use phi.tr=1
+plotts.sample.wge(xdif)
+```
+The filtering weakened the frequency component at f=0.05 and served as a high-pass filter. The filter allows some frequency behavior as low as 0.05 to to leak into the filtered data. It is not as good as the Butterworth filter for filtering out one of the signals.
+
+##Problem 3.4
+
+Using the same random number seed in each case generate realizations of length 200 from the AR(1) processes for (phi)??1 = ±0.9, ±0.5 and
+```{r}
+pp9=plotts.true.wge(n=200,phi = .9)
+pn9=plotts.true.wge(n=200,phi = -.9)
+pp5=plotts.true.wge(n=200,phi = .5)
+pn5=plotts.true.wge(n=200,phi = -.5)
+```
+
+
+
+
+a. Plot the true autocorrelations.
+b. Plot the true spectral density.
+c. Find sigma squared X.
+```{r}
+#sigma squared X for .9
+pp9$acv[1]
+#sigma squared X for -.9
+pn9$acv[1]
+#sigma squared X for .5
+pp5$acv[1]
+#sigma squared X for -.5
+pn5$acv[1]
+```
+d. Plot the realizations.
+e. Plot the sample autocorrelations.
+```{r}
+sp9=gen.arma.wge(n=200,phi = .9,sn=1)
+plotts.sample.wge(sp9)
+
+sn9=gen.arma.wge(n=200,phi = -.9,sn=1)
+plotts.sample.wge(sn9)
+
+sp5=gen.arma.wge(n=200,phi = .5,sn=1)
+plotts.sample.wge(sp5)
+
+sn9=gen.arma.wge(n=200,phi = -.5,sn=1)
+plotts.sample.wge(sp5)
+```
+
+f. For ?? 1 = 0.9, repeat steps (a ??? c) with . What differences and similarities do you observe?
+
