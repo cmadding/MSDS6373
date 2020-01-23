@@ -1,5 +1,8 @@
 #UNIT 3 Time Series
-
+library(tidyverse) # needs to be run every time you start R and want to use %>%
+library(tswge)
+library(tseries)
+library(stats)
 
 # Breakout 1
 
@@ -51,8 +54,9 @@ parzen.wge(xx$x.filt,trunc = 70)
 
 
 #Walmart Analysis 
-Walmart = read.csv(file.choose(),header = TRUE)
-Store8Item50 = Walmart %>% filter(store == "8", item = "50")
+Walmart = read.csv("Data/Walmart.csv",header = TRUE)
+Stor8Item1 = Walmart %>% dplyr::filter(item == 1 & store == 8)
+Store8Item50 = Walmart %>% dplyr::filter(store == 8 & item == 50)
 plotts.wge(Store8Item50$sales)
 parzen.wge(na.omit(Store8Item50$sales))
 parzen.wge(na.omit(Store8Item50$sales), trunc = 500)
@@ -89,5 +93,3 @@ SigSq_Xt  = 1/(1-.7^2)
 
 SigSq_Hat_Xt
 SigSq_Xt
-
-
