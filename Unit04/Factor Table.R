@@ -1,0 +1,46 @@
+library(tswge)
+
+#Question 4.6.4
+# X_t - .2X_t-1 - .4X_t-2 = a_t
+#Factor Table
+factor.wge(phi = c(.2, .4))
+
+#Plotting a relization along with true
+# autocorrelations and spectral density
+plotts.true.wge(phi = c(.2, .4))
+
+# X_t + .5X_t-1 + .6X_t-2 = a_t
+#Factor Table
+factor.wge(phi = c(-.5, -.6))
+
+#Plotting a relization along with true
+# autocorrelations and spectral density
+plotts.true.wge(phi = c(-.5, -.6))
+
+# X_t - 1.95X_t-1 + 1.8X_t-2 - .855X_t-3 = a_t
+#Factor Table
+factor.wge(phi = c(1.95, -1.85, .855))
+
+#Plotting a relization along with true
+# autocorrelations and spectral density
+plotts.true.wge(phi = c(1.95, -1.85, .855))
+
+
+# X_t - 1.59X_t-1 + .544X_t-2 + .511X_t-3 - .222X_t-4 = a_t
+#Factor Table
+factor.wge(phi = c(1.59, -.544, -.511, .222))
+
+#Plotting a relization along with true
+# autocorrelations and spectral density
+plotts.true.wge(phi = c(1.59, -.544, -.511, .222))
+
+
+# X_t - .2X_t-1 - 1.23X_t-2 + .26X_t-3 + .66X_t-4 = a_t
+#Factor Table
+factor.wge(phi = c(.2, 1.23, -.26, -.66))
+
+#Plotting a relization along with true
+# autocorrelations and spectral density
+plotts.true.wge(phi = c(.2, 1.23, -.26, -.66))
+
+plotts.true.wge(phi = c(-.59, -.544, -.511, -.222))
