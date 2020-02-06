@@ -19,12 +19,17 @@ parzen.wge(na.omit(Store9Item50$sales), trunc = 500)
 
 aic5.wge(Store9Item50$sales)
 
-#Find ρ1 for the following model by hand.
-#Xt = at–.8at-1 + .5at–2.
--.8/(1+.5)
-#[1] -0.5333333
-plotts.true.wge(theta=c(.8,-.5))
-
+#Find p1 for the following model by hand.
+#MA(2) Model
+#Xt = at-.8at-1 + .5at-2.
+(-.8+.8*-.5)/(1+.8^2+((-.5)^2))
+#[1] -0.6349206
+p1=plotts.true.wge(theta=c(.8,-.5))
+#p1 in r using tswge
+p1$aut1[1:5]
+#[1]  1.0000000 -0.6349206  0.2645503  0.0000000  0.0000000
+p1$aut1[2]
+#[1] -0.6349206
 
 #Generate a realizations from an ARMA model.
 #You pick p and q.
