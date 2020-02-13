@@ -4,8 +4,10 @@ gen.sigplusnoise.wge(100,2,4,vara = 100)
 gen.sigplusnoise.wge(100,0,0,vara = 10)
 gen.sigplusnoise.wge(100,b0 = 0, b1 = 0, phi = .975, vara = 10)#AR(1)
 
+arma=gen.sigplusnoise.wge(100,b0 = 0, b1 = 0, phi = .4, vara = 2)#AR(1)
+
 #Periodic Signal
-gen.sigplusnoise.wge(100,coef = c(5,0), freq = c(.1,0), psi = c(0,.25), vara = 10)
+gen.sigplusnoise.wge(100,coef = c(5,0), freq = c(.1,0),psi = c(.25,0), vara = 10)
 
 
 #AR(4) From slides
