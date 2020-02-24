@@ -21,6 +21,7 @@ factor.wge(c(0.6996, 0.2599, 0.0079, -0.0646, 0.1381, -0.0953, 0.0235, -0.0969, 
 
 # Factor the model below and show that it is a monthly seasonal model:
 # (.2B – .4B2 – .49B3 – 1B12 – .2B13 + .4B14 + .4B14 + .49B15) Xt = (1 + .92B)at
+#when looking for the season info we can ingorne the MA side
 factor.wge(c(-0.20, 0.40, 0.49, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 1.00, 0.20, -0.40, -0.49)) 
 # Looking at the factor table there are 2 extra numbers, thoses become the leftover factors
 # (1-0.88B)(1+1.08B+.55B^2)(1-B^12)Xt=(1+.29B)at

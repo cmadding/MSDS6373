@@ -15,6 +15,7 @@ factor.wge(phi = c(0,0,0,1))
 # Stationarize Monthly Seasonal Data:
 # Taking out the (1 - B12)
 
+#AR(3) and MA(1) components
 # (1 - .4B - .6B2 + .74B3)(1 - B12) Xt = (1 + .7B)at
 x12=gen.aruma.wge(n=80, phi = c(.4,.6,-.74), theta = c(-.7), s=12, sn = 31)
 #Take out the (1-B^12) rep=repeate 11 zeros and put a one at the end

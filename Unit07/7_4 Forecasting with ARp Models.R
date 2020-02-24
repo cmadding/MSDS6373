@@ -29,7 +29,9 @@ fore.arma.wge(x3,phi=c(1.6,-.8), theta = -.9, n.ahead=20,limits=FALSE)
 fore.arma.wge(x3,phi=c(.8), theta = -.9, n.ahead=20,limits=FALSE)
 
 
+data(llynx)
 #ARMA(4,1)
 #(1 – 0.967B) (Xt – 2.9) = (1 + .6B)at 
 #ARMA(4,1): phi = c(.967), theta = –.477
 fs41 = fore.arma.wge(llynx,phi = c(0.7, 0.1, -0.2, -0.3), theta = -.6,n.ahead = 40,limits = FALSE)
+

@@ -41,6 +41,22 @@ qeq<-function(a,b,c){
 #quq(a,b,c)
 qeq(-0.12,-0.4,1)
 
-#X_t +.5X_t-1 +.6X_t-2 = at
-qeq(0.6,0.5,1)
-factor.wge(phi = c(-0.5, -0.6))
+#X_t -1.4X_t-1 +.48X_t-2 = at
+qeq(0.48,-1.4,1)
+factor.wge(phi = c(1.4, -0.48))
+
+#Logged Lynx data
+#(1-1.38z+.75z2)
+data(lynx)
+qeq(0.75,-1.38,1)
+factor.wge(phi = c(1.38, -.75))
+plotts.true.wge(n=100,c(1.38, -.75))
+
+#AR(3)
+factor.wge(phi = c(1.95, -1.85,.855))
+plotts.true.wge(phi=c(1.95, -1.85,.855))
+
+#AR(4)
+factor.wge(phi = c(1.6, -.23,-1,.576))
+plotts.true.wge(phi=c(1.6, -.23,-1,.576))
+

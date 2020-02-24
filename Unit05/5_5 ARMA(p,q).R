@@ -15,7 +15,7 @@ factor.wge(c(.3,.9,.1,-.8075))
 plotts.true.wge(theta = c(-.9,-.8,-.72))
 factor.wge(phi = c(-.9,-.8,-.72))
 
-#ARMA
+#ARMA(4,3) From above
 plotts.true.wge(phi = c(.3,.9,.1,-.8075), theta = c(-.9, -.8,-.72))
 
 #5.5.10

@@ -18,3 +18,6 @@ factor.wge(phi = c(-.1,.3))
 #reciprocal/system frequency (dip in the spectral density) combination?
 plotts.true.wge(phi = c(-.1,.3))
 #No, but it is the only invertible model that will have this combination.
+
+plotts.true.wge(250,phi = c(1.3,-.4),theta = c(.8))
+plotts=plotts.true.wge(250,phi = c(.5))

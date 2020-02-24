@@ -2,7 +2,7 @@ library(tswge)
 
 #ARIMA(0,1,0)
 #(1-B)X1=at
-x1=gen.arima.wge(n=200,phi = 0, var = 1,d=1, sn=31)
+x1=gen.arima.wge(n=200,phi = 0,theta = 0,var = 1,d=1, sn=31)
 plotts.sample.wge(x1)
 acf(x1)
 

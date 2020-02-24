@@ -28,3 +28,6 @@ plot(t,y3,type = "l")
 #This has 3 Frequency in it
 ysum = y1+y2+y3
 plot(t,ysum,type = "l")
+plotts.sample.wge(ysum)
+parzen.wge(ysum, trunc=70)
+parzen.wge(llynx)
