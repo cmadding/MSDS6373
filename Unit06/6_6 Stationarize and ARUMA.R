@@ -26,7 +26,7 @@ aic5.wge(Dif12)
 gen.aruma.wge(n=200,phi=.7,d=1,s=12,lambda=c(1.6,-1),theta=-.8)
 
 
-#(1 – .6B + .8B^2)(1 - B^12) Xt = (1-.3 + .7B^2)at
+#(1 - .6B + .8B^2)(1 - B^12) Xt = (1-.3 + .7B^2)at
 x12_500=gen.aruma.wge(n=500, phi = c(.6,-.8), theta = c(.3, -.7), s=12, sn = 37)
 #Take out the (1-B^12) rep=repeate 11 zeros and put a one at the end
 FirstDif12 = artrans.wge(x12_500,c(rep(0,11),1))

@@ -1,5 +1,5 @@
 #7.9 Forecasting with Seasonal Models
-
+library(tswge)
 #Forecasts from the pure seasonal model
 #(1 - B^4) Xt = at
 x=gen.aruma.wge(n=20,s=4, sn = 6)
@@ -9,13 +9,15 @@ x=gen.aruma.wge(n=20,s=4, sn = 6)
 fore.aruma.wge(x,s=4,n.ahead=8,lastn=TRUE,plot=TRUE,limits=FALSE)
 
 #forecasts using seasonal model
-#An AR term
+#An AR term phi=.8 seasonal 4
 #(1 - .8B)(1 - B^4) Xt = at
 x=gen.aruma.wge(n=20,phi=.8,s=4,sn = 6)
 fore.aruma.wge(x,phi=.8,s=4,n.ahead=8,limits=FALSE)
 #
 x=gen.aruma.wge(n=20,phi=.8,s=4,sn = 6)
 fore.aruma.wge(x,phi=.8,s=4,n.ahead=8,lastn = T, limits=FALSE)
+
+
 
 #is the 13th-order AR operator given by Parzen et al. (1980).
 data(airlog)

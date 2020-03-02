@@ -184,3 +184,9 @@ info = get_all_a_calc(x, phi, theta)
 
 
 live2=fore.arma.wge(x,phi = c(.9,.8),n.ahead = 8)
+
+
+#AR(2,1)
+x3 = gen.arma.wge(n=75, phi = c(1.2,-.6),theta = .5, sn=24)
+fore.arma.wge(x3,phi=c(1.2,-.6), theta = .5, n.ahead=20,limits=FALSE)
+get_all_a_calc(x=x3,phi=c(1.2,-.6),theta = .5)

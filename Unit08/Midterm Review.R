@@ -9,6 +9,8 @@ xdf = c(5,9,13,15,14,10,12,17,20,25)
 #estimate the Mean (X Bar)
 Xbar = mean(xdf)
 
+sigma=sqrt(var(xdf))
+
 #(Rho=P) Autocorrelations of series by lag
 Rhos=acf(xdf, type = "correlation", plot = F)
 Rhos0=Rhos$acf[1]

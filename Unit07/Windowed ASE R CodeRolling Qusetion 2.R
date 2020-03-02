@@ -3,9 +3,9 @@
 # This idea is to calculate many ASEs and take there average by using a smaller training set and forecasting the last 'n' many times. 
 
 library(readr)
-amtrak <- read.csv("Unit07/AmtrakPassengersMonthly.csv")
+#amtrak <- read.csv("Unit07/AmtrakPassengersMonthly.csv")
 
-#amtrak = read.csv(file.choose(),header = TRUE)
+amtrak = read.csv(file.choose(),header = TRUE)
 
 #Model 1
 phis = c(0.5511, 0.1680, -0.0145, 0.0651, 0.1388, -0.2966, 0.1539, 0.1270, -0.1815, 0.0364, 0.1456, 0.6287, -0.3832, -0.0199, -0.1679)

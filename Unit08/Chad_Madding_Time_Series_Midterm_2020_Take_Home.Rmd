@@ -1,0 +1,265 @@
+---
+title: "Time Series Midterm 2020 Take Home"
+author: "Chad Madding"
+date: "February 29, 2020"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tswge)
+library(tswgewrapped)
+```
+
+### Take-Home Portion:
+
+Due 11:59pm CST Saturday February 29. Please Submit to 2DS in addition to Emailing it to Dr. Sadler. 
+
+### Question about the realization.
+1. Do you think the data come from a stationary process? Defend your thoughts using the 3 conditions of stationarity. Provide acf plots for condition 3.
+```{r stationary, echo=TRUE}
+#load the midterm data
+midterm2020 = read.csv("midterm2020.csv",header = TRUE)
+#Convert to a Time Series
+midterm2020 = ts(midterm2020$x)
+```
+Description
+
+**Midterm2020 is a dataset in the form of a CSV provided for the take-home portion of the Spring 2020 Midterm in MSDS 6373 Time Series.**
+
+Additional Realization
+
+**We do not know the origin of the Midterm2020 dataset other than it was provided for one portion of the midterm. Therefore, we cannot obtain additional realizations.**
+
+Condition 1 - Subpopulations of $Xt$ have the same mean for each $t$. Restated, the mean does not depend on time ($t$).
+```{r Visualize, echo=TRUE}
+#Visualize the midterm data
+plotts.wge(midterm2020)
+```
+
+**The Midterm2020 dataset appears to oscillate with some seasonality. The series trends up slightly, then declines during the last unit, which does appear to represent a year. It seems the series cannot be stationary because there is a level of dependency between the mean and time.**
+
+Condition 2 - Subpopulations of $X$ for a given time have a finite and constant variance for all $t$. Restated, the variance does not depend on time.
+
+**We can not accurately assess the homoscedasticity of the Midterm2020 dataset since the data is dependent on time (and therefore not stationary). Nonetheless, variance seems to be greater earlier in the measurements and smaller later in the measurements.**
+
+Condition 3 - The correlation between $Xt_1$ and $Xt_2$ depends only on $t_1-t_2$. That is, the correlation between data points depends only on how far apart they are in time, not where they are in time.
+
+**Based on the first ACF chart (ACF of midterm2020), there appears to be a strong seasonal component represented in the sinusoidal degradation. Autocorrelation cycles are almost identical across similar volumes of lags, evenly spaced.**
+
+```{r acf full, echo=TRUE}
+acf(midterm2020, main="ACF of midterm2020")
+```
+
+```{r acf 1st half, echo=TRUE}
+acf(midterm2020[1:72],plot=TRUE, main="ACF of midterm2020 1st Half")
+```
+
+```{r acf 2nd half, echo=TRUE}
+acf(midterm2020[72:144],plot=TRUE, main="ACF of midterm2020 2nd Half")
+```
+
+**In analyzing the ACFs of the first and second halves of the series, the autocorrelations seem to mirror themselves (when comparing the first half to the second half). Therefore, the data seems dependent on position in time, not just on the distance between each pair of points.**
+
+Conclusion
+
+**Because the three conditions of a stationary time series cannot be confirmed, we must conclude that this is not a stationary time series and that there is a dependency on time driving the position of each successive data point.**
+
+### The Models:
+#### Consider these two models of the data in the realization in Midterm2020.csv:
+
+- Model 1: $$(1-B^{12})( 1-0.5380B-0.0606B^2-0.1923B^3)X_t=a_t$$
+- Model 2: $$(1-1.0507B+0.0756B^2)X_t=(1-0.5927B-0.2751B^2)a_t$$
+
+#### Questions about Model 1:
+2. Write this model in GLP form up to 4 terms.
+
+```{r models, echo=TRUE}
+psi.weights.wge(phi = c(0.5380, 0.0606, 0.1923), lag.max = 4)
+```
+
+$$(1-B^{12})Xt=at+0.538a_{t-1}+0.35a_{t-2}+0.413a_{t-3}+0.347a_{t-4}$$
+
+#### Questions about Model 2:
+3. Is Model 2 Invertible? Provide evidence for or against.
+
+**Model 2 is invertible, in that both absolute reciptricals are less than 1.**
+
+```{r Invertible, echo=TRUE}
+factor.wge(phi = c(1.0507, -0.0756))
+```
+
+#### Questions for each model:
+4.	Provide acfs and spectral densities for each model.
+
+**Here are the ACF and spectral density for Model 1.**
+
+```{r afc 1, echo=TRUE}
+#Model 1
+#plotts.sample.wge(x = midterm2020, phi = c(0.5380, 0.0606, 0.1923),s=12)
+plotts.true.wge(phi = c(0.5380, 0.0606, 0.1923))
+```
+
+**Here are the ACF and spectral density for Model 2.**
+
+```{r afc 2, echo=TRUE}
+#Model 2
+plotts.true.wge(phi = c(1.0507,-0.0756), theta = c(0.5927, 0.2751))
+```
+
+5.	Provide a factor table for each model.
+
+**Here is the factor table for Model 1.**
+```{r factor 1, echo=TRUE}
+#Model 1 factor table
+factor.wge(phi = c(0.5380, 0.0606, 0.1923))
+```
+
+**Here is the factor table for Model 2.**
+
+```{r factor 2, echo=TRUE}
+#Model 2 factor table
+factor.wge(phi = c(1.0507,-0.0756))
+```
+
+6.	Calculate the ASE for the last 12 months of the data set. (This will be only 1 ASE per model.).
+
+```{r Question 6, echo=TRUE}
+#Get the length of the dataset
+lengthMT2020=length(midterm2020)
+#Model 1 Forcast
+model1Q6f = fcst(aruma, midterm2020, s = 12, phi = c(0.5380, 0.0606, 0.1923), n.ahead = 12, lastn = T, plot = F)
+#Model 1 ASE
+model1Q6_ase = ase(midterm2020, model1Q6f)
+
+#Model 2 Forcast
+model2Q6f = fcst(arma, midterm2020, phi = c(1.0507,-0.0756), theta = c(0.5927,0.2751), n.ahead = 12, lastn = T, plot = F)
+#Model 2 ASE
+model2Q6_ase = ase(midterm2020, model2Q6f)
+```
+**The ASE for Model 1 for the last 12 months of the data set: `r sprintf("%.0f", model1Q6_ase)`**
+```{r ASE Model 1, echo=TRUE}
+model1Q6_ase
+```
+
+**The ASE for Model 2 for the last 12 months of the data set: `r sprintf("%.0f", model2Q6_ase)`**
+```{r ASE Model 2, echo=TRUE}
+model2Q6_ase
+```
+
+
+7.	Calculate at least 10 ASEs across the data set and find their average (the rolling window ASE).
+
+```{r Question 7 Model 1, echo=TRUE}
+#Model 1
+phis1 = c(0.5380, 0.0606, 0.1923)
+thetas1 = 0
+s1  = 12
+d1  = 0
+
+trainingSize = 70
+horizon = 12
+ASEHolder1 = numeric()
+dataLength=length(midterm2020)
+i=0
+for( i in 1:(dataLength-(trainingSize + horizon) + 1))
+{
+  
+  forecasts1 = fore.aruma.wge(midterm2020[i:(i+(trainingSize-1))],phi = phis1, theta = thetas1, s = s1, d = d1,n.ahead = horizon, plot = F)
+  
+  ASE1 = mean((midterm2020[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - forecasts1$f)^2)
+         
+  ASEHolder1[i] = ASE1
+
+}
+
+ASEHolder1
+hist(ASEHolder1)
+summary(ASEHolder1)
+WindowedASE1 = mean(ASEHolder1)
+WindowedASE1
+
+# Visualization
+
+i = length(ASEHolder1)
+fs1 = fore.aruma.wge(midterm2020[i:(i+(trainingSize+horizon)-1)],phi = phis1, theta = thetas1, s = s1, d = d1,n.ahead = 12, lastn = T, plot = T)
+ASE1 = mean((midterm2020[(i+trainingSize):(i+(trainingSize+horizon)-1)] - fs1$f )^2)
+```
+
+```{r Question 7 Model 2, echo=TRUE}
+#Model 2
+phis2 = c(1.0507,-0.0756)
+thetas2 = c(0.5927, 0.2751)
+s2  = 0
+d2  = 0
+
+ASEHolder2 = numeric()
+i=0
+for( i in 1:(dataLength-(trainingSize + horizon) + 1))
+{
+  
+  forecasts2 = fore.arma.wge(midterm2020[i:(i+(trainingSize-1))],phi = phis2, theta = thetas2, n.ahead = horizon, plot = F)
+  
+  ASE2 = mean((midterm2020[(trainingSize+i):(trainingSize+ i + (horizon) - 1)] - forecasts2$f)^2)
+         
+  ASEHolder2[i] = ASE2
+
+}
+
+#ASEHolder2 = ASEHolder
+hist(ASEHolder2)
+WindowedASE2 = mean(ASEHolder2)
+
+summary(ASEHolder2)
+WindowedASE2
+
+# Visualization
+
+i = length(ASEHolder2)
+fs2 = fore.arma.wge(midterm2020[i:(i+(trainingSize+horizon)-1)],phi = phis2, theta = thetas2, n.ahead = horizon, lastn = TRUE, plot = T)
+ASE2 = mean((midterm2020[(i+trainingSize):(i+(trainingSize+horizon)-1)] - fs2$f )^2)
+```
+
+8.	Compare the single ASE to the rolling window ASE. Are they roughly the same, is one significantly larger?  Does it provide evidence as to which model is more useful?
+
+**Now, let's compare the single ASE from question 6 to the “windowed” results in question 7. For Model one, we have the original ASE at `r sprintf("%.0f", model1Q6_ase)` and the windowed at `r sprintf("%.0f", WindowedASE1)`. The original ASE from the second model is `r sprintf("%.0f", model2Q6_ase)` and the windowed model 2 ASE is `r sprintf("%.0f", WindowedASE2)`. Both models ASE’s improved significantly, but when the original ASE’s were calculated, model 2 had the better ASE. After applying a rolling window to both models, the first model outperformed the second one. Applying an average to ASE’s taken in windowed sections provide evidence that model one is more useful.**
+
+```{r Question 8, echo=TRUE}
+#Original model 1 ase
+model1Q6_ase
+#Windowed model 1 ase
+WindowedASE1
+#Original model 2 ase
+model2Q6_ase
+#Windowed model 2 ase
+WindowedASE2
+```
+
+#### Final Question:
+9.	Given your analysis, which model do you feel is more useful in making 12-month forecasts? 
+
+**Given all the information above, we feel model one will outperform the second one over time. The ACF obtained on the first model using the rolling window method proved to be better than the second model.**
+
+#### BONUS (up to 3 points):
+Create an interesting, descriptive and useful plot to visualize the forecasts that the rolling window ASE was based on. This would help the analyst diagnose why the ASE is large or small and/or where it is fitting relatively well and relatively poorly.  In addition, it may add confidence to the client that the model is performing adequately.
+
+**To help visualize how much better model one could perform over model two, we have provided a few plots of both models. Each chart shows a forecast for the coming year.**
+
+**With the results collected from the rolling window ASE model, one will outperform the second model. The Forecast Model One plot below shows a more natural trend seen over the past several years.**
+
+##Forecast Model One
+```{r BONUS Part 1, echo=FALSE}
+#Model 1 Forcast
+fore.aruma.wge(midterm2020[i:(i+(trainingSize+horizon)-1)],phi = phis1, theta = thetas1, s = s1, d = d1,n.ahead = 12, lastn = F, plot = T)
+```
+
+**Model two is trending to the mean. This type of data has too much seasonality in it for model two, and the ASE seemed to point that out.**
+
+##Forecast Model Two
+```{r BONUS Part 2, echo=FALSE}
+#Model 2 Forcast
+fs2 = fore.arma.wge(midterm2020[i:(i+(trainingSize+horizon)-1)],phi = phis2, theta = thetas2, n.ahead = horizon, lastn = F, plot = T)
+```

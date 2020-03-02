@@ -30,6 +30,9 @@ wnv2=sum((live2$resid)^2)/6
 #White Noise Standard Dev = 0.9979437
 wnSD=sqrt(live2$wnv)
 
+#half width example
+(1.96*1.87)*sqrt(1^2 + (0.4)^2 + (-0.44)^2)
+
 #half width third forecast (Xhat(3))
 (1.96*live2$wnv)*sqrt(1 + (live2$psi[1])^2 + (live2$psi[2])^2)
 #The half width if the third forecast (Xhat(3)) = 5.723868

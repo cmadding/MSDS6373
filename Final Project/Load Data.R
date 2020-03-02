@@ -21,7 +21,23 @@ SMUSwipe$Date <- as.Date(SMUSwipe$`Message Date/Time`)
 SMUSwipe$Hours <- format(SMUSwipe$`Message Date/Time`,"%Y-%m-%d-%H")
 head(SMUSwipe)
 df = count(SMUSwipe, "Hours")
-plotts.wge(df$freq)
-plotts.sample.wge(df$freq)
+#convert to time series
+SMUturn101.2LB = ts(df$freq)
 
-aic5.wge(df$freq)
+#Plot the data
+plotts.wge(SMUturn101.2LB)
+plotts.sample.wge(SMUturn101.2LB)
+
+#Use aic.wge() or aic5.wge() to identify estimates of p and q. 
+aic5.wge(SMUturn101.2LB)
+#Changing some settings
+aic5.wge(SMUturn101.2LB,p=0:11,q=0:2,type="aic")
+aic5.wge(SMUturn101.2LB,p=0:11,q=0:2,type="bic")
+
+#Use the estimate of p and q to get estimates of the phis and thetas.
+est = est.arma.wge(SMUturn101.2LB, p = 4, q = 2)
+
+#Use the estimated model to forecast and so on. 
+phi=est$phi
+theta=est$theta
+fore.arma.wge(SMUturn101.2LB, phi = est$phi, theta = est$theta, n.ahead = 24, limits=F)

@@ -4,16 +4,16 @@ plotts.wge(llynx)
 #Again, consider the log lynx dataset. Previously,
 #we have looked at an AR(4) model for these data:
 
-#(1 – 1.3B + 0.7B2 – 0.1B3 + 0.2B4)(Xt – 2.9) = at
+#(1 - 1.3B + 0.7B2 - 0.1B3 + 0.2B4)(Xt - 2.9) = at
 #AR(4): phi = 1.3, -0.7, 0.1, -0.2
 AR4f = fore.arma.wge(llynx,phi = c(1.3, -0.7, 0.1, -0.2), n.ahead = 30, limits = FALSE)
 
-#(1 - 0.7B - 0.1B2 + 0.2B3  + 0.3B4) (Xt – 2.9) = (1 + .6B)at
+#(1 - 0.7B - 0.1B2 + 0.2B3  + 0.3B4) (Xt - 2.9) = (1 + .6B)at
 #ARMA(4,1): phi = 0.7,  0.1, - 0.2,  - 0.3, theta = -.6
 ARMA41f = fore.arma.wge(llynx,phi = c(0.7,0.1,-0.2,-0.3), theta = -.6, n.ahead = 30, limits = FALSE)
 
 #But how good are these forecasts?
-#We can’t know because we don’t know the actual values.
+#We can't know because we don't know the actual values.
 
 #Use lastn=TRUE to see how good the model is on real numbers.
 #AR(4)
@@ -22,7 +22,6 @@ AR4f2 = fore.arma.wge(llynx,phi = c(1.3, -0.7, 0.1, -0.2), n.ahead = 30, lastn =
 ARMA41f2 = fore.arma.wge(llynx,phi = c(0.7,0.1,-0.2,-0.3), theta = -.6, n.ahead = 30, lastn = TRUE, limits = FALSE)
 #AR(11) by Tong in 1977
 AR11tong = fore.arma.wge(llynx,phi=c(1.17, -0.54, 0.27, -0.31, 0.15, -0.15, 0.06, -0.03,0.13, 0.20, - 0.34),n.ahead=30,limits=FALSE, lastn = TRUE)
-
 
 #AR(4) ASE
 AR4_ASE = mean((AR4f2$f-llynx[85:114])^2)

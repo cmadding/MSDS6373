@@ -11,4 +11,5 @@ psi.weights.wge(phi=c(1.2,-.6),theta=c(.5),lag.max=5)
 
 #5.7.3 Check
 # psi-weights for simple AR(2) model X(t)-1.95X(t-1)+1.9X(t-2)=a_t
-psi.weights.wge(phi=c(1.95,-1.9),lag.max=4)
+psi.weights.wge(phi=c(-.7),lag.max=4)
+fore.arma.wge()
