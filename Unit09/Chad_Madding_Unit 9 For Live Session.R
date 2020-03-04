@@ -12,6 +12,7 @@ texasgasprice = ts(texasgasprice$Price, start = c(2015,1), end = c(2018,49), fre
 #Visualize/plot the data.
 plotts.wge(texasgasprice) #data read into array texasgasprice
 plot(texasgasprice, type="l", main="Texas Gas Prices Jan 2015 - Dec 2018")
+plotts.sample.wge(texasgasprice)
 
 #1. Fit an AR(2) to the data using the maximum likelihood estimates (mle) like you did in the Concept Check question.
 texasgasprice.mle=est.ar.wge(texasgasprice,p=2,type='mle')
