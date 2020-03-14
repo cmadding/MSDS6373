@@ -59,7 +59,6 @@ plotts.true.wge(phi = c(0.15, -0.4))
 factor.wge(phi = c(-.5, -.6))
 ar2=plotts.true.wge(phi=c(-.5, -.6))
 
-
 #AR(3)
 factor.wge(phi = c(1.95, -1.85,.855))
 ar3=plotts.true.wge(phi=c(1.95, -1.85,.855))

@@ -1,0 +1,154 @@
+---
+title: 'Unit 10: For Live Session'
+author: "Chad Madding"
+date: "March 9, 2020"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tswge)
+library(readr)
+```
+### Select a data set, and complete one of each model ID below:
+#### ARIMA
+
+First we read in the data collected from:
+https://archive.ics.uci.edu/ml/datasets/Appliances+energy+prediction
+```{r read}
+# read in the data
+x = read.csv("energydata_complete.csv", header = TRUE)
+```
+
+Convert the data to time series
+```{r convert to TS}
+#Just looking at the Appliances data
+x=ts(x$Appliances)
+```
+
+Plot the data and see the associated (damping) sample autocorrelations
+```{r Plot, echo=FALSE}
+#Plot the data
+plot.x=plotts.sample.wge(x)
+plot.x
+```
+
+We will follow the Classical Box-Jenkins Procedure for Including a Unit Root in the Model.
+If data are wandering and sample autocorrelations damp slowly difference the data with a d-1
+```{r difference}
+# difference the data
+x.d1=artrans.wge(x,phi.tr=1)
+```
+
+The data looks stationary so there is no need to difference again.
+Estimate the parameters of the "stationarized data".
+```{r AIC5 estimate}
+# x.d1 appears to be stationary
+aic5.wge(x.d1,p=0:5,q=0:2)
+```
+
+AIC picks an ARMA(3,1)
+```{r estimate}
+# AIC picks an ARMA(3,1)
+# which seems reasonable from
+est.x.d1=est.arma.wge(x.d1,p=3,q=1)
+```
+
+Pull out what will make up the final model
+```{r final model}
+#Pull out what will make up the final model
+est.x.d1$phi
+est.x.d1$theta
+est.x.d1$avar
+mean(x)
+#(1_B)^2(1-1.27B+.68B^2)(Xt-1512)=at WHV=1.03
+```
+** Final Model**
+$$(1-B)(1-0.731B+0.203B^2-0.069B^3)(X_t+97.69)=(1-0.919B)a_t\ \sigma^2_a=4418.18$$
+
+#### Seasonal
+
+First we read in the data collected from tswge.
+```{r read in nottem}
+x = data("nottem")
+```
+
+Convert the data to time series
+```{r convert nottem to TS}
+x=ts(nottem)
+```
+
+Plot the data and see seasonality in the sample autocorrelations
+```{r seas Plot}
+plotts.sample.wge(x)
+```
+
+The behavior in the realization tends to repeat every 12th (s) time periods.
+
+The sample autocorrelations large at s12.
+
+A seasonal model with season s=12 make sense.
+
+Estimate the parameters of the "stationarized data".
+```{r B12 overfit}
+# overfit factor table of 24
+over.x=est.ar.wge(x,p=24, factor = TRUE,type = 'burg')
+```
+Compare factors in overfit factor table with those for $(1 - B^s)$.
+```{r B12 Factor Table}
+factor.wge(p=c(0,0,0,0,0,0,0,0,0,0,0,1))
+```
+
+There is a somewhat close match so we will transform the data.
+
+**Transformed data by $(1-B^{12})$**
+
+```{r Transform B12}
+# Transform differenced data with "seasonal difference"
+y=artrans.wge(x,phi.tr=c(0,0,0,0,0,0,0,0,0,0,0,1))
+```
+
+The data looks somewhat stationary.
+The next step is to model the transformed data with a $(1-B^{12})$
+```{r B12 WNV}
+# find the WNV
+wnv=sd(y)^2
+```
+** Final Model**
+$$(1-B^{12})X_t=a_t\ \sigma^2_a=11.82$$
+
+#### Signal Plus Noise with Cochrane-Orcutt
+First we need to install the correct libraries.
+```{r install orcutt}
+#install.packages("orcutt")
+library(orcutt)
+```
+We will need to import the data and set up a data frame.
+```{r read in orcutt}
+# read in the data
+x = read.csv("energydata_complete.csv", header = TRUE)
+```
+
+Convert the data to time series
+```{r convert to orcutt TS}
+#Just looking at the Appliances data
+x=ts(x$Appliances)
+```
+Setup a data frame.
+```{r data frame}
+t = seq(1,19735,1)
+df = data.frame(x = x, t= t)
+```
+
+Check the fit for OLS
+```{r}
+fit = lm(x~t, data = df)
+summary(fit)
+```
+Check the fit for Cochrane Orcutt
+```{r}
+cfit = cochrane.orcutt(fit)
+summary(cfit)
+```

@@ -1,0 +1,309 @@
+---
+title: "Unit 11"
+author: "Chad Madding"
+date: "March 12, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      results = "show")
+library(tswge)
+```
+
+## 11.2 White Noise and Whitening the Residuals
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r Ljung-Box Test}
+#ljung.wge(res,p,q,K)
+# res residual file
+# after ARMA(p,q) fit to data
+# K is capital K above (default=24)
+```
+
+## Residual Analysis: ARMA(2,1) Example
+
+Generate the realization from ARMA(2,1)examined earlier
+```{r 11.2.5, echo=FALSE}
+x=gen.arma.wge(n=100,phi=c(1.6,-.9),theta=.8,sn=67)
+x=x+10
+plotts.sample.wge(x)
+```
+
+These seem to indicate stationarity
+Sample autocorrelations damp quickly
+
+AIC picks ARMA(2,1)
+```{r aic.wge}
+aic.wge(x,p=0:8,q=0:4)
+
+x21=est.arma.wge(x,p=2,q=1)
+# x21$phi: 1.6194830 -0.9131788
+# x21$theta: 0.868127
+# x21$vara: 1.076196
+mean(x)  # 10.07557
+```
+
+Final model:
+
+$$(1-1.62B+0.91B^2)(X_t-10.08)=(1-0.87B)a_t\ \sigma^2_a=1.08$$
+#### Next we examine the residuals
+
+x21$res: Contains residuals from the ARMA(2,1) fit
+
+** Check 1: Examine plots of residuals and their sample autocorrelations **
+
+  + Residuals look "white"?
+  + Residual sample autocorrelations within 95% limit lines?
+```{r, echo=T, results='hide'}
+plotts.sample.wge(x21$res)
+```
+
+** Check 2: Ljung-Box test **
+
+K=24
+```{r}
+ljung.wge(x21$res,p=2,q=1,K=24)
+# $K: 24  (default)
+# $chi.square: 20.92251
+# $df: 21
+# $pval: 0.4636851
+```
+We failed to reject the null hypothesis of white noise.
+
+Try with a K=48.
+```{r}
+ljung.wge(x21$res,p=2,q=1,K=48)
+# $K: 48 
+# $chi.square: 44.93891
+# $df: 45
+# $pval: 0.4636851
+```
+
+For both K=24 and 48 we fail to reject white noise.
+
+
+11.2.6 White Noise and Whitening the Residuals
+Simulated Seasonal Data
+```{r Simulated Seasonal Data, echo=T, results='hide'}
+x=gen.aruma.wge(n=200,s=12,phi=c(1.5,-.8),sn=87)
+x=x+50
+plotts.sample.wge(x,lag.max=60)
+```
+
+Modeling the data:
+Overfit tables suggested a factor of (1-B^12)
+We transformed the data by (1-B^12)
+```{r}
+y=artrans.wge(x,phi.tr=c(0,0,0,0,0,0,0,0,0,0,0,1))
+```
+
+.    Transformed data appeared to be stationary
+
+.    After transforming the data we used BIC which selected an AR(2) model
+```{r}
+est.y=est.ar.wge(y,p=2)
+```
+.    And obtained the fitted model
+$$ (1-B^{12})(1-1.47B+0.76B^2)(X_t-49.78)=a_t\ \sigma^2_a=1.04$$
+
+How about the residuals in est.y$res?
+
+**Check 1:** Examine plots of residuals and their sample autocorrelations
+```{r, echo=T, results='hide'}
+plotts.sample.wge(est.y$res)
+```
+
+.    Residuals look "white"
+
+.    Residual sample autocorrelations within 95% limit lines
+
+**Check 2:** Ljung-Box test
+
+**Recall:** When we fit an ARIMA or Seasonal Model, we transform the data to stationarity. The p and q 
+in the Ljung-Box call statement are for
+the estimation of the stationary component. (in this case p=2)
+```{r}
+ljung.wge(est.y$res,p=2)
+```
+
+```{r}
+ljung.wge(est.y$res,p=2,K=48)
+```
+
+For both K=24 and 48 we **fail to reject white noise**.
+Based on Checks 1 and 2 the residuals from the fitted seasonal model **seem to be white**.
+
+#### Log Airline Data
+
+In order to analyze the residuals, we recreate the steps necessary to retrieve them in tswge.
+
+We overfitthe data with p=14 and 16 (steps not shown) and determined the need to transform to obtain
+(1???B)(????B^????)1???????????12????????????????=d1.12 in the code below
+
+Transform Data
+```{r}
+data(airlog)
+# transform data
+# Difference the data
+d1=artrans.wge(airlog,phi.tr=1)
+```
+
+Transform differenced data by $(1-B^{12})$
+```{r}
+s12=c(0,0,0,0,0,0,0,0,0,0,0,1)
+d1.12=artrans.wge(d1,phi.tr=s12)
+```
+aic and aicc pick ARMA(12,1)
+```{r ARMA(12,1)}
+aic.wge(d1.12,p=0:15,q=0:3)
+```
+
+```{r (d1.12,p=12,q=1)}
+# estimate parameters of stationary part
+est.12.1=est.arma.wge(d1.12,p=12,q=1)
+```
+
+The residuals are in est.12.1$res  
+**Check 1:** Examine residuals and their sample autocorrelations
+```{r, echo=T, results='hide'}
+plotts.sample.wge(est.12.1$res)
+```
+
+. Residuals look "fairly white" (unusual behavior between 65-100)  
+. Residual sample autocorrelations within 95% limit lines  
+**Check 2:** Ljung-Box test  
+As with the previous example, pand qfor the Ljung-Box test are those obtained when fitting a stationary model to the transformed data. (in this case p=12, q=1)  
+```{r}
+ljung.wge(est.12.1$res,p=12,q=1)
+```
+
+```{r}
+ljung.wge(est.12.1$res,p=12,q=1,K=48)
+```
+
+**Conclusions and comments:**  
+. The residuals "pass" both checks for white noise  
+. We noted some behavior that was somewhat worrisome in the residual plot  
+. For K=24, we did not reject ????????0but we would have if testing at ??=.10  
+. The first two examples were simulated data from ARMA and seasonal models  
+. The residuals were "nice and white"  
+. For the log airline data, the seasonal model we fit is our "best guess" at a model that describes the behavior of the data  
+. In practice, we often see residual analyses that aren't as definitive as in the simulated examples  
+. In fact, the airline results are quite good  
+
+**Next Steps:**  
+**Answer Questions of Interest**  
+The question of interest may have been to forecast the number of airline passengers two months later and to quantify our uncertainty.  
+```{r question of interest}
+TwoMonthFore= fore.aruma.wge(airlog,d = 1, s = 12, phi = est.12.1$phi, theta = est.12.1$theta,n.ahead = 2, limits = TRUE)
+TwoMonthFore
+```
+**Conclusion:** In two months we are 95% confident that the number of airline passengers will be between 399,415 (e5.99  1000) and 468,717 (e6.15  1000) passengers. Our best estimate is 432,681 (e6.07  1000) passengers.  
+We have to convert back from the log data.
+
+#### 11.3.1 Con Check  
+Step 1: Use the code below to fit the model.  
+Step 2: Obtain and plot the residuals, and plot the ACF of the residuals.  
+**Question:**  
+Do the residuals and ACF look consistent with white noise?  
+```{r 11.3.1 Con Check}
+data(airlog) # load from tswge package
+airlog1 = artrans.wge(airlog,phi.tr=1)
+airlog1.12 = artrans.wge(airlog1,phi.tr = c(rep(0,11),1))
+ww = est.ar.wge(airlog1.12,p = 12)
+```
+  
+Step 3: Perform the Ljung-Box test on the residuals.  
+```{r}
+ljung.wge(ww$res,p=12)
+```
+
+#### 11.4 Global Temperature Data
+
+**Does the model make sense?**  
+Another important check for model appropriateness  
+.  Stationary vs. nonstationary  
+.  Seasonal vs. non-seasonal  
+.  Correlation-based vs. signal-plus-noise model  
+.  Are characteristics of fitted model consistent with those of the data  
+  +  Forecasts and spectral estimates make sense?  
+  +  Do realizations and their characteristics behave like the data?  
+
+**a)  Fitting a stationary model to the data:**  
+```{r hadley}
+data(hadley)
+mean(hadley) #-0.1684937
+plotts.sample.wge(hadley)
+aic5.wge(hadley,p=0:6,q=0:1)
+```
+AIC picks an ARMA(3,1) stationary model  
+```{r}
+had.est=est.arma.wge(hadley,p=3,q=1)
+# $phi: 1.2700171 -0.4685313  0.1911988
+# $theta: 0.6322319
+# $avar: 0.01074178
+```
+**Fitted ARMA(3,1) model:**  
+$$(1-1.27B+0.47B^2-0.19B^3)(X_t+.17)=(1-0.63B)a_t\\ where\ \sigma^2_a=0.0107$$  
+or in factored form using the factor table:  
+$$(1-0.99B)(1-0.28B+0.19B^2))(X_t+0.17)=(1-0.63B)a_t$$  
+(this is a "nearly nonstationary" model)  
+**Check residuals**  
+```{r, echo=T, results='hide'}
+plotts.sample.wge(had.est$res,arlimits=TRUE)
+```
+```{r ljung.wge 24}
+ljung.wge(had.est$res,p=3,q=1)
+```
+
+```{r ljung.wge 48}
+ljung.wge(had.est$res,p=3,q=1,K=48)
+```
+Residuals look "white" and residual sample autocorrelations stay sufficiently within 95% limit lines  
+**Ljung-Box results**  
+P-values for K=24and K=48are 0.42and 0.41, respectively.  
+**Conclusion:** Residuals for stationary **ARMA(3,1)** fit appear to be white.
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### Erata
+11.3.1
+There is no code.  Here is the code:
+
+data(airlog) # load from tswge package
+airlog1 = artrans.wge(airlog,phi.tr=1)
+airlog1.12 = artrans.wge(airlog1,phi.tr = c(rep(0,11),1))
+ww = est.ar.wge(airlog1.12,p = 12)
+
+11.3.2
+
+To run the Llung-Box test, use K = 24
+You should get a pvalue of .01645 # this is the correct answer but the computer has a different answer.  
+
+The computer will want .4969
+
+11.3.3
+
+The computer will want "YES" but the answer is actually "NO" since the pvalue in the last questions changed from above .05 to below .05.  (FTR Ho to Reject Ho).  
+
+
+11.6.2
+The model specification in the video is listed as .33 instead of 1.33 (missing the 1.)
+
+
+
+

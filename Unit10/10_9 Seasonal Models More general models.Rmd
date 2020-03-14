@@ -1,0 +1,450 @@
+---
+title: "10.9 Seasonal Models - More General Model"
+author: "Chad Madding"
+date: "March 8, 2020"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tswge)
+options(scipen = 999)
+```
+
+## Model
+$$(1-B^{12})(1-1.5B+0.8B^2)(X-50)=a_t$$
+
+
+```{r simulate}
+x=gen.aruma.wge(n=200, s=12,phi = c(1.5,-0.8), sn=87)
+# add in the mean
+x=x+50
+```
+
+## Visualize The Data
+
+See what we are dealing with:
+
+```{r pressure}
+plot=plotts.sample.wge(x,lag.max = 60)
+```
+
+## Overfit Factor Table
+
+Use a number over what you think the seasonality looks to be. 
+```{r overfit}
+d15=est.ar.wge(x,p=17, type = 'burg')
+```
+
+Look in the factor table for patterns matching know seasonal tables.
+
+Here is a factor table of $(1-B^{12})$.
+```{r known 12 table}
+#(1-B^12)
+factor.wge(c(rep(0,11),1))
+```
+**Note:** The factor 1-0.9136B is not very close to the unit circle, but since all other factors are consistent with $(1-B^{12})$ we conclude that this overfit table suggests $(1-B^{12})$ also.
+
+## Transform
+
+Base on the overfit table we can now transform the data to remove the seasonality.
+
+Transform data to create $Y_t=(1-B^{12})X_t$
+
+```{r}
+#rep will repeat the 11 zeros then we can add a one at the end
+y=artrans.wge(x,phi.tr = (c(rep(0,11),1)))
+```
+
+The transformed data appear stationary, so we use AIC to identify a model.
+
+We use **aic5.wge** to model the transformed data (y)
+When using AIC to model data that has been stationarized using the seasonal transform $(1-B^{12})$, it is good practice to allow a range of p values to include s to uncover any seasonal stationary information that might be in the data.
+In R code to follow, we consider the range p=0:13 and q=0:3
+
+```{r}
+# y is the transformed data
+aic5.wge(y,p=0:13,q=0:3)
+```
+
+AIC selects an ARMA(4,2) model. Factoring the ARMA(4,2) model we obtain:
+```{r est the y}
+est = est.arma.wge(y,p=4, q=2, factor = TRUE)
+est$phi
+est$theta
+```
+**Note:** The dominant behavior of the transformed data is a pseudo cyclic behavior of length about 10 $(f_0=.10)$.
+The factors associated with frequency about $f_0=.2$ essentially cancel.
+
+We can look for a simpler model using BIC. Use the y data.
+```{r}
+aic5.wge(y,p=0:13,q=0:3,type='bic')
+```
+
+BIC picks a simpler AR(2) model. This is consistent with:
+
+* The pseudo cyclic data
+* Damping cyclical sample autocorrelations
+
+**Decision:** We choose to model the transformed data as an AR(2).
+```{r}
+est2=est.ar.wge(y,p=2)
+```
+We can now write our model using data collected from **est.ar.wge**.
+```{r final model}
+#Get the phi's for the model
+est2$phi
+#Get the White Noise Var
+est2$avar
+#Figure the mean with the original x data
+mean(x)
+```
+#### Our final model:
+$$(1-B^{12})(1-1.47B+0.76B^2)(x_t-49.78)=a_y\  \sigma^2_a=1.04$$
+
+#### The Original Model:
+$$(1-B^{12})(1-1.5B+0.8B^2)(X-50)=a_t$$
+
+### 10.9.4 Concept Check
+
+Consider the attached Southwest Airlines flight delay data (SWADelay.csv). Use **est.ar.wge()** to overfit an **AR(15)** model with the Burg estimates. We are trying to gauge if there is sufficient evidence to suggest a $(1-B^{12})$ factor is in the model. Look at the factor table, and answer the following questions.
+
+```{r}
+#read in the data
+SWA = read.csv("swadelay.csv",header = TRUE)
+plotts.wge(SWA$arr_cancelled)
+```
+
+
+```{r}
+#Get and an estimate using the arr_delay information
+#Overfitting with and AR(15)
+d15SW=est.ar.wge(SWA$arr_delay,p=15, type = 'burg')
+```
+*10.9.4* What is the root associated with the factor (from the factor table you generated) that would be matched with the $(1-B)$ term from the $(1-B^{12})$ factor table?
+
+Express your response rounded to four decimal places.
+*1.0310*
+
+*10.9.5* Look at the system frequencies from the factor table you generated. What is the system frequency associated with the the factor that would be matched with the $(1 - 1.732B + B^2)$ factor from the $(1-B^{12})$ factor table?
+
+```{r}
+factor.wge(phi = c(rep(0,11),1))
+```
+
+Express your response rounded to four decimal places.
+*0.0848*
+
+*10.9.6* Do you feel that there is enough evidence to suggest a $(1-B^{12})$ factor should be present in our final model?
+
+*Yes*
+
+This is subjective, but there is only one term that doesn't match up almost exactly (the $(1 + B + B^2)$) B. No. We will take this answer, but you would almost have some domain knowledge or other evidence to not include a $(1-B^{12})$ in this case. Note: The spectral density shows a clear peak at 1/12 = .08, but this does not in and of itself mean that $(1-B^{12})$ is appropriate. There are many other factors of smaller degree that will yield this frequency.
+
+*Note:* The spectral density shows a clear peak at 1/12 = .08, but this does not in and of itself mean that $(1-B^{12})$ is appropriate. There are many other factors of smaller degree that will yield this frequency.
+
+### Forcast with the final model:
+$$(1-B^{12})(1-1.47B+0.76B^2)(x_t-49.78)=a_y\  \sigma^2_a=1.04$$
+Generate data:
+```{r}
+#This is our original data at the top of the project
+x=gen.aruma.wge(n=200, s=12,phi = c(1.5,-0.8), sn=87, plot = F)
+# add in the mean
+x=x+50
+```
+
+Forecast:
+```{r}
+fore.aruma.wge(x,s=12,phi = c(1.47,-0.76),n.ahead = 36,lastn = FALSE)
+```
+```{r}
+forcast = fore.aruma.wge(x,s=12,phi = c(1.47,-0.76),n.ahead = 36,lastn = TRUE)
+```
+```{r}
+ase = mean((x[(200-36+1):200] - forcast$f)^2)
+```
+
+
+*Summary:*
+
+* The forecasts (open circles) are very close to the true values.
+* We were able to fit a model very close to the true model.
+* Forecasts (ahead and last 36) are quite good.
+
+### 10.10 Seasonal Models: Example-Airline Data
+
+```{r}
+data("airlog")
+lair=ts(airlog)
+plotts.sample.wge(airlog)
+```
+
+
+```{r}
+est.lair=est.ar.wge(lair,p=15,type='burg')
+```
+Matching up the factor tables it could have a (1-B^12).
+
+*Note:*
+
+* Factor tables for other high orders are similar
+* The factor $1-1.9697B+0.9704B^2$ is associated with a frequency of $f_0$ = 0.0034 or a period of 1/.0034 = 294 (longer than the data record). This suggests aperiodic data or a very long period.
+* Also this factor is very close to $1-2B+B2 = (1-B)2$ which is associated with frequency $f_0 = 0$
+    + We encountered a similar situation with an ARIMA model with $d=2$.
+    + $(1-B)^2$ provides the last "piece" needed for a factor of $(1-B^{12})$ plus an extra $(1-B)$ factor
+    + That is, the factor table suggests the presence of nonstationary factors $(1-b)(1-B^{12})$
+* Although $(1+.85B)$ is not as close to the unit circle "as we would expect for $s=12$ data, the "total picture" suggests a factor of $(1-B^{12})$
+
+**In the log airline factor table**
+$(1-B)^2$ provides the last "piece" needed for a factor of $(1-B^{12})$ plus an extra (1-B) factor
+
+**Recall:**
+We earlier discussed the following model that is useful for modeling seasonal data with a trend
+
+$$(1-B)(1-B^s)\phi(B)(X_t-\mu)=\theta(B)a_t$$
+
+We referred to it as the **airline model**,for obvious reasons!
+
+**Note:**
+The airline model allows for stationary components 
+* To find these, we transform to find $Y_t=(1-B)(1-B^{12})X_t$
+
+#### Transform to Stationarity
+
+Using tswge to transform log airline data (lair) to remove seasonal and ARIMA components
+```{r}
+#Difference the data
+d1=artrans.wge(lair,phi.tr=1)
+```
+
+* Trend has been removed
+* 12 month seasonal behavior remains
+
+#### Differenced Data Transformed by $(1-B^{12})$
+```{r}
+# Transform differenced data with "seasonal difference"
+d1.12=artrans.wge(d1,phi.tr=c(0,0,0,0,0,0,0,0,0,0,0,1))
+```
+
+* Appears to be stationary 
+* No trending or seasonality present 
+* We will find a stationary model for this realization 
+
+#### Finding a Final Model for the (log) Airline Data
+Use **tswge** to model the transformed data, d1.12 (twice transformed data)
+```{r}
+aic5.wge(d1.12,p=0:13,q=0:3)
+```
+AIC picks an **ARMA(12,1)**. 
+* In order to see if a lower order model could satisfactorily model the data, we use BIC
+```{r}
+aic5.wge(d1.12,p=0:13,q=0:3,type='bic')
+```
+BIC picks an **MA(1)** as the first choice and an **AR(1)** as second choice. 
+
+  * Examining the data and sample autocorrelations, neither model seems appropriate
+  * We decide to use the ARMA(12,1) model chosen by AIC 
+  
+```{r}
+est.d1.12=est.arma.wge(d1.12,p=12,q=1)
+est.d1.12$phi
+est.d1.12$theta
+est.d1.12$avar
+mean(lair)
+```
+**Comments**
+
+* Recall from an earlier unit that forecasts using the airline model are quite good
+		+ We previously used the **AR(13) (Woodward / Gray Model)** instead of the **ARMA(12,1) (Box Model)** but forecasts are very similar
+* Recall also that $(1-B)(1-B^{12})$ contains two factors of $(1-B)$ which accounts for the fact that the trend in the airline data is predicted to continue
+* It is clear that seasonal models are useful for data that occur monthly or quarterly or some other sampling interval where similar patterns are likely to be repeated
+
+#### Pennsylvania Temperature Data
+
+The data set is available in tswge.
+```{r}
+data('patemp')  # the data set is available in tswge
+plotts.sample.wge(patemp)
+```
+
+There certainly seems to be a "seasonal" pattern
+Autocorrelations damp slowly
+**Again!** Use overfit procedure
+```{r}
+est.ar.wge(patemp,p=14,type='burg')
+```
+```{r}
+est.ar.wge(patemp,p=15,type='burg')
+```
+** Factor Tables for Pennsylvania Temperature Data **
+
+	* These factor tables are not what we expected
+		+ We expected to see the factors of $(1-B^{12})$ approximated by factors with roots very close to the unit circle
+		+ This is what we saw in the previous two seasonal examples
+	* The only factor of $(1-B^{12})$ that has the behavior we expected is $(1-1.732B+B^2)$
+		+ Each factor table had a factor very close to this one with roots close to the unit circle
+	* This suggests that the stationarizing transformation is $Y_t=(1-1.732B+B^2 )X_t$
+
+** We Transform the Data by: ** 
+
+$Y_t=(1-1.732B+B^2 )X_t$
+
+```{r}
+y.tr=artrans.wge(patemp,phi.tr=c(1.732,-1))
+```
+	
+The transformed data appear stationary
+```{r}
+aic5.wge(y.tr,p=0:13, q=0:3)
+```
+
+Using aic5.wge with p=0:13, q=0:3, an AR(9) is selected
+
+```{r}
+aic5.wge(y.tr,p=0:13, q=0:3,type = 'bic')
+```
+Using aic5.wge with the same range for p and q and using BIC, an AR(3) is selected
+Let's go with the simpler model
+
+```{r}
+est.patemp=est.ar.wge(y.tr,p=3)
+est.patemp$phi
+est.patemp$avar
+mean(patemp)
+```
+Final model:
+$$(1-1.732B+B^2)(1+1.14B+0.84B^2+0.41B^3)(X_t-52.63)=a_t\ \sigma^2_a=10.77$$
+
+**Note:**
+
+  * The above model is an example of what Woodward, et al., 2017, refer to as an **ARUMA** model
+  * It is a more general nonstationary model that can contain roots on the unit circle that are not necessarily +1
+  * Seasonal models are ARUMA models
+  
+**Do not** include $(1-B^{12})$, for example, in the model simply because there is a 12th order nonstationarity or because the data show a period of 12 or just because you have monthly data
+
+### 10.12 Signal Plus Noise Models: Testing for Trend OLS Method
+
+**Concept Check 10.12.2**
+
+Please use the data you create from the below steps to answer this and the next two Concept Check questions.
+
+We would like to test the type I error rate of the OLS (ordinary least squares) estimates of the slope when the residuals are correlated. To do this we will generate a realization from a model with no trend $(b1 = 0)$ and see how often $Ho:\beta_1=0$ is rejected.
+
+**Step 1:** We want to generate a realization with no trend but with correlated residuals.
+
+$$X_t=0+0_t+Z_t$$
+$Z_t$ is generated from an **AR(1)** model with phi=0.95: $(1-0.95B)Z_t=a_t$
+
+To do this, run the following code:
+```{r}
+x = gen.sigplusnoise.wge(100, b0 = 0, b1= 0, phi= .95, sn = 28)
+```
+
+**Step 2:** Fit a regression line to the data using the following code:
+
+```{r}
+t = seq(1,100,1)
+df = data.frame(x = x, t= t)
+fit = lm(x~t, data = df)
+summary(fit)
+```
+
+What is the p-value for the test?
+
+  * $Ho:\beta_1=0$
+  * $Ha:\beta_1???0$
+  
+**Much smaller than .05**
+
+Does this test suggest that there is a trend (nonzero slope)?
+
+** Yes, Even though we know that there is not a trend.**
+
+Was this a type I error?
+
+** Yes, We rejected when $Ho:\beta_1=0$ was true.**
+
+Was this a fluke?
+
+We would now like to investigate just how common it is to conclude that there is a trend when there actually is not a trend (stationary process). 
+
+Remember that if **alpha = .05**, then the test should find significant slope when none is present about 5 percent of the time. This means that if we generated a realization with no trend 10 times, we would not be surprised to see zero or one rejections (type I errors).  
+
+Let's experiment and see what you get. Simply run the following code and respond to the free response/discussion question.
+
+Run this code 10 times, and record how many out of 10 it rejected (type I error).
+```{r}
+#note that there is not a seed this time. We will generate a different realization each time.
+x = gen.sigplusnoise.wge(100, b0 = 0, b1= 0, phi= .99)
+t = seq(1,100,1)
+df = data.frame(x = x, t= t)
+fit = lm(x~t, data = df)
+summary(fit) # record whether it rejected or failed to reject. 
+```
+
+Comment below on how many out of 10 rejected $H_o:\beta_1=0$ and whether you were surprised or alarmed.  
+
+What do you think would happen if we changed phi to .99 instead of .95?
+
+**Running the code above produced eight out of ten Type 1 Errors. Raising the phi to .99 produced nine out of ten errors.**
+
+**This is a really bad way to test for trend in time series data**
+  * You will detect a (deterministic) trend in many cases in which no such trend exists
+  * The test is picking up on the random trends in AR(1) data
+
+#### Cochrane-Orcutt in R 
+
+```{r orcutt}
+#install.packages("orcutt")
+library(orcutt)
+#Generate some data
+x = gen.sigplusnoise.wge(500, b0 = 0, b1= 0, phi= .95, sn = 21)
+```
+This is the old way:
+```{r}
+#Generate a sequence
+t = seq(1,500,1)
+df = data.frame(x = x, t= t)
+fit = lm(x~t, data = df)
+summary(fit)
+```
+
+Now use the **Cochrane-Orcutt** method by just pasing our data to it.
+```{r}
+cfit = cochrane.orcutt(fit) 
+summary(cfit)
+```
+
+**10.13.3 Check*
+
+**Consider again the Southwest Airlines delay data (SWADelay.csv particularly the arr_delay column).** 
+
+Management wants to know if there is evidence that the mean delay is increasing over time, or if the recent increase is a "random trend" and can be expected to revert back to some lesser mean number of delays in the future.  
+
+Looking at the data, it looks like there is a trend, but is it real?
+
+Fit a simple linear regression to the data using arr_delay as the response and time as the explanatory variable (you will have to create this variable).
+
+**What is the p-value?**
+```{r}
+#Generate a sequence
+SWA.coc_or=SWA$arr_delay
+#convert to a time series
+SWA.coc_or=ts(SWA.coc_or)
+t = seq(1,177,1)
+df = data.frame(x = SWA.coc_or, t= t)
+fit = lm(x~t, data = df)
+summary(fit)
+cfit = cochrane.orcutt(fit)
+summary(cfit)
+```
+
+After adjusting for AR(1) errors, is there still significant evidence that as time increases, so will the mean number of delays?
+
+**Yes**
+
