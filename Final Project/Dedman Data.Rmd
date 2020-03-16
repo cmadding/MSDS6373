@@ -16,7 +16,7 @@ library(ggplot2)
 
 ## Read in the data
 
-The data is from a turnstile at the Dedman Center for Lifetime Sports on the Southern Methodist University campus. 
+The data is from three turnstiles at the Dedman Center for Lifetime Sports on the Southern Methodist University campus. 
 ```{r Read in}
 #Read in the data
 SMUSwipe <- read_excel("AnonDataTurnstile.xlsx")

@@ -1,7 +1,7 @@
 ---
 title: "Unit 11"
 author: "Chad Madding"
-date: "March 12, 2020"
+date: "March 14, 2020"
 output: html_document
 ---
 
@@ -13,9 +13,34 @@ library(tswge)
 
 ## 11.2 White Noise and Whitening the Residuals
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+**Purpose of this unit:**  
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+In previous units we have learned about a variety of useful time series models, how to fit these models to data, etc.  
+
+  * In this unit, we will step back and take a closer look at the model(s) we have fit to a set of data to ascertain whether the models appear to be **appropriate**  
+    + And are not simply the best we've been able to do so far  
+  * Things to consider include  
+    + Whether basic assumptions of the models are satisfied  
+    + Ramifications of selecting certain models  
+    + Forecasting performance (we've already looked at this)  
+
+#### Testing Residuals for White Noise  
+
+We will focus on two methods for checking the residuals for white noise.  
+
+**Check 1:** Visually inspect plots of the residuals and their sample autocorrelations  
+
+  * The residuals should look like white noise (random)  
+  * About 95% of the sample autocorrelations of the residuals should stay within the limit lines.  
+
+**Check 2:** Ljung-Box test  
+
+Whereas checking the limit lines apply separately to each lag k, Ljung-Box tests the hypothesis
+
+The Ljung-Box test is referred to as a portmanteau [port man to] test.  
+
+  * "Portmanteau" is a seldom-used word that can mean "embodying several uses or qualities"  
+  * Ljung-Box tests the autocorrelations as a group  
 
 ```{r Ljung-Box Test}
 #ljung.wge(res,p,q,K)
@@ -27,7 +52,7 @@ When you click the **Knit** button a document will be generated that includes bo
 ## Residual Analysis: ARMA(2,1) Example
 
 Generate the realization from ARMA(2,1)examined earlier
-```{r 11.2.5, echo=FALSE}
+```{r 11.2.5, echo=FALSE, results='hide'}
 x=gen.arma.wge(n=100,phi=c(1.6,-.9),theta=.8,sn=67)
 x=x+10
 plotts.sample.wge(x)
@@ -49,22 +74,24 @@ mean(x)  # 10.07557
 
 Final model:
 
-$$(1-1.62B+0.91B^2)(X_t-10.08)=(1-0.87B)a_t\ \sigma^2_a=1.08$$
-#### Next we examine the residuals
+$$(1-1.62B+0.91B^2)(X_t-10.08)=(1-0.87B)a_t\ \sigma^2_a=1.08$$  
 
-x21$res: Contains residuals from the ARMA(2,1) fit
+#### Next we examine the residuals  
 
-** Check 1: Examine plots of residuals and their sample autocorrelations **
+x21$res: Contains residuals from the ARMA(2,1) fit  
 
-  + Residuals look "white"?
-  + Residual sample autocorrelations within 95% limit lines?
+**Check 1: Examine plots of residuals and their sample autocorrelations**  
+
+  + Residuals look "white"?  
+  + Residual sample autocorrelations within 95% limit lines?  
+  
 ```{r, echo=T, results='hide'}
 plotts.sample.wge(x21$res)
 ```
 
-** Check 2: Ljung-Box test **
+**Check 2: Ljung-Box test**  
 
-K=24
+K=24  
 ```{r}
 ljung.wge(x21$res,p=2,q=1,K=24)
 # $K: 24  (default)
@@ -72,9 +99,9 @@ ljung.wge(x21$res,p=2,q=1,K=24)
 # $df: 21
 # $pval: 0.4636851
 ```
-We failed to reject the null hypothesis of white noise.
+We failed to reject the null hypothesis of white noise.  
 
-Try with a K=48.
+Try with a K=48.  
 ```{r}
 ljung.wge(x21$res,p=2,q=1,K=48)
 # $K: 48 
@@ -83,45 +110,46 @@ ljung.wge(x21$res,p=2,q=1,K=48)
 # $pval: 0.4636851
 ```
 
-For both K=24 and 48 we fail to reject white noise.
+For both K=24 and 48 we fail to reject white noise.  
 
 
-11.2.6 White Noise and Whitening the Residuals
-Simulated Seasonal Data
+**11.2.6 White Noise and Whitening the Residuals**  
+Simulated Seasonal Data  
+
 ```{r Simulated Seasonal Data, echo=T, results='hide'}
 x=gen.aruma.wge(n=200,s=12,phi=c(1.5,-.8),sn=87)
 x=x+50
 plotts.sample.wge(x,lag.max=60)
 ```
 
-Modeling the data:
-Overfit tables suggested a factor of (1-B^12)
-We transformed the data by (1-B^12)
+Modeling the data:  
+Overfit tables suggested a factor of (1-B^12)  
+We transformed the data by (1-B^12)  
 ```{r}
 y=artrans.wge(x,phi.tr=c(0,0,0,0,0,0,0,0,0,0,0,1))
 ```
 
-.    Transformed data appeared to be stationary
-
-.    After transforming the data we used BIC which selected an AR(2) model
+  * Transformed data appeared to be stationary  
+  * After transforming the data we used BIC which selected an AR(2) model  
+  
 ```{r}
 est.y=est.ar.wge(y,p=2)
 ```
 .    And obtained the fitted model
 $$ (1-B^{12})(1-1.47B+0.76B^2)(X_t-49.78)=a_t\ \sigma^2_a=1.04$$
 
-How about the residuals in est.y$res?
+How about the residuals in est.y$res?  
 
-**Check 1:** Examine plots of residuals and their sample autocorrelations
+**Check 1:** Examine plots of residuals and their sample autocorrelations  
+
 ```{r, echo=T, results='hide'}
 plotts.sample.wge(est.y$res)
 ```
 
-.    Residuals look "white"
+  * Residuals look "white"  
+  * Residual sample autocorrelations within 95% limit lines  
 
-.    Residual sample autocorrelations within 95% limit lines
-
-**Check 2:** Ljung-Box test
+**Check 2:** Ljung-Box test  
 
 **Recall:** When we fit an ARIMA or Seasonal Model, we transform the data to stationarity. The p and q 
 in the Ljung-Box call statement are for
@@ -162,7 +190,7 @@ aic and aicc pick ARMA(12,1)
 aic.wge(d1.12,p=0:15,q=0:3)
 ```
 
-```{r (d1.12,p=12,q=1)}
+```{r d1 stationary}
 # estimate parameters of stationary part
 est.12.1=est.arma.wge(d1.12,p=12,q=1)
 ```
@@ -176,7 +204,7 @@ plotts.sample.wge(est.12.1$res)
 . Residuals look "fairly white" (unusual behavior between 65-100)  
 . Residual sample autocorrelations within 95% limit lines  
 **Check 2:** Ljung-Box test  
-As with the previous example, pand qfor the Ljung-Box test are those obtained when fitting a stationary model to the transformed data. (in this case p=12, q=1)  
+As with the previous example, p ans q for the Ljung-Box test are those obtained when fitting a stationary model to the transformed data. (in this case p=12, q=1)  
 ```{r}
 ljung.wge(est.12.1$res,p=12,q=1)
 ```
@@ -268,14 +296,273 @@ Residuals look "white" and residual sample autocorrelations stay sufficiently wi
 P-values for K=24and K=48are 0.42and 0.41, respectively.  
 **Conclusion:** Residuals for stationary **ARMA(3,1)** fit appear to be white.
 
+#### Nonstationary Model  
+**Global Temperature Data**  
+**Nonstationary model fit to temperature data:**  
+**Indications of a unit root of +1**  
+There are several indications that an ARIMA model might be appropriate for the temperature data.
+. The stationary model has a factor of (1???.99????)
+. The wandering behavior and fairly slowly damping sample autocorrelations  
+. The overfit tables with p=8 and p=12(not shown) suggest the possibility of a single unit root of +1  
+. The Dickey-Fuller test of ????????0:the model has a unit root, is not rejected (p-value=.5611)  
+
+**b) Nonstationary model fit to temperature data:**  
+Suppose that based on the evidence we make the decision to fit an ARIMA model to the temperature data.  
+. (Even though the model checks: white noise residuals, realizations that have the appearance of the data, etc. were good for the ARMA model)  
+  
+In this case we proceed by differencing the hadley data.  
+```{r, echo=T, results='hide'}
+d1.temp=artrans.wge(hadley,phi.tr=1)
+plotts.sample.wge(d1.temp,arlimits=TRUE)
+```
+. The differenced data appear to be stationary  
+  + And nearly "white"
+. However, the fact that the first two sample autocorrelations are outside the limits lines suggests that we continue to model  
+**Model the differenced data**  
+```{r}
+aic5.wge(d1.temp,p=0:6,q=0:1)
+```
+AIC selects an ARMA(2,1)  
+```{r}
+d1.temp.est=est.arma.wge(d1.temp,p=2,q=1)
+# $phi: 0.3274341 -0.1786827
+# $theta: 0.704618
+# $avar: 0.01058826
+mean(hadley)
+```
+**Fitted ARIMA(2,1,1) model:**  
+$$(1-B)(1-0.33B+0.18B^2)(X_t+0.17)=(1-0.70B)a_t\\ where\ \widehat{\sigma}^2_a=0.0106$$
+**Check residuals**  
+```{r, echo=T, results='hide'}
+plotts.sample.wge(d1.temp.est$res,arlimits=TRUE)
+```
+Residuals look "white" and residual sample autocorrelations stay sufficiently within 95% limit lines.  
+**Ljung-Box results**  
+```{r}
+ljung.wge(d1.temp.est$res,p=2,q=1)
+```
+
+```{r}
+ljung.wge(d1.temp.est$res,p=2,q=1,K=48)
+```
+
+P-values for K=24 and K=48are 0.47 and 0.58, respectively.  
+**Conclusion:** Residuals for stationary ARMA(2,1) fit appear to be white.  
+
+**Clearly:** The two models are quite similar to each other.  
+  . The main difference is the stationary factor $(1-0.99B)$ vs. the nonstationary factor $(1-B)$  
+  . Residuals appear to be white for both models  
+  . Realizations from the two models are similar  
+
+**How about forecasts?**  
+Forecasts using stationary model:   
+```{r, echo=T, results='hide'}
+data(hadley)
+fore.arma.wge(hadley,phi=c(1.27,-.47,.19), theta=.63,n.ahead=50,limits=FALSE)
+```
+
+Forecasts using nonstationary model:  
+```{r, echo=T, results='hide'}
+fore.aruma.wge(hadley,d=1,phi=c(.33,-.18), theta=.7,n.ahead=50,limits=FALSE)
+```
+
+**Caution:** The decision concerning whether the observed warming trend should be predicted to continue is one that involves a variety of climatological issues we are not discussing here.  
+**We simply ask the question:**  
+Given reasonable models fit to the historical data, would these models predict the current trend to continue?  
+  . The answer is "No" based on the standard ARMA and ARIMA fits to the temperature data  
+  . Which seem like reasonable models and easily passed the checks for white noise residuals, etc.  
+  . So, is there any statistical argument for claiming the trend should continue?  
+
+#### Fitting Signal-Plus-Noise Models
+
+For purposes of this example, we will use the Cochrane-Orcutt procedure for testing for trend in the temperature data set.  
+1. Fit a regression line to the data and find the residuals from the line  
+```{r Cochrane-Orcutt}
+x=hadley
+n=length(x)
+t=1:n
+d=lm(x~t)
+#Find the residuals
+x.z=x-d$coefficients[1]-d$coefficients[2]*t
+#x.zare the residuals from the regression line
+```
+2. Fit an AR(p) model $\widehat{\phi}_z(B)$ to the residuals and find $\widehat{Y}_t=\widehat{\phi}_z(B)X_t$  
+($\widehat{Y}_t=$y.trans in the code below)  
+```{r}
+ar.z=aic.wge(x.z,p=0:6)
+#ar.z$pis the order p
+#ar.z$phiis vector of ar.z$pestimated AR coefficients
+y.trans=artrans.wge(hadley,phi.tr=ar.z$phi)
+```
+
+3. Transform the independent variable (time)  
+$\widehat{T}_t=\widehat{\phi}_z(B)T_tT_1=1, T_2= etc.$  
+$\widehat{T}_t=$t.trans
+```{r}
+#ar.z$phiis vector of ar.z$pestimated AR coefficients
+t.trans=artrans.wge(t,phi.tr=ar.z$phi)
+```
+
+4. Regress $\widehat{Y}_t$ on $\widehat{T}_t$ using OLS.  
+```{r}
+fitco = lm(y.trans~t.trans)
+summary(fitco)
+```
+
+After accounting for the serial correlation (AR(4)), there is strong evidence to suggest that the slope is significantly different from zero (pvalue< .0001).  
+
+**Evaluating residuals (after Cochrane-Orcutt)**  
+```{r}
+plotts.wge(fitco$residuals)
+```
+```{r}
+acf(fitco$residuals)
+```
+
+```{r}
+ljung.wge(fitco$residuals)
+```
+
+```{r}
+ljung.wge(fitco$residuals, K=48)
+```
+
+Sample autocorrelations tend to stay within limit lines and Ljung-Box test has p-values of .805 and .577 for K=24 and 48 respectively.  
+
+**Estimated signal-plus-noise model:**  
+The slope and intercept comes from the d variable.
+```{r}
+#hadely = a + bt
+summary(d)
+#Xt = (Intercept) -0.5257370 + t 0.0044378
+```
+
+The phi's and WNV comes from the ar.z variable.  
+```{r}
+#Phi's and White Noise Var
+ar.z$vara
+factor.wge(ar.z$phi)
+```
+All of this information is in the fore.sigplusnoise.wge function as well.
+
+$X_t=-0.5257+0.0044t+Z_t\\ where\ \widehat{\sigma}^2_a=0.0103$  
+$(1-0.614B+0.044B^2-0.078B^3-0.026B^4)Z_t=a_t$ or the factored form  
+$(1-0.92B)(1-0.21B+0.43B^2)(1+0.52B)Z_t=a_t$  
+
+**Note 1:** The above is the signal-plus-noise fit to the temperature data. Cochrane-Orcutt is a procedure to assess the significance of the slope (adjusting for the correlated errors).  
+**Note 2:** We had to code the Cochrane-Orcutt Procedure manually since the function cochrane.orcutt() is only for AR(1) correlation.  
+
+**Forecasts using Signal-Plus-Noise Model**  
+```{r}
+fore.sigplusnoise.wge(hadley,max.p = 4,n.ahead = 50,limits = FALSE)
+```
+
+Interestingly, the forecasts suggest an initial decline but eventually predict the trend to continue.  
+
+**Important Points**  
+
+  * Realizations from AR (ARMA/ARUMA) models have random trends  
+  * Unless there are 2-unit roots, these models will not forecast a trend to continue  
+  * Realizations from Xt= St+ Zt have deterministic trends  
+  * If conditions do not change, then these trends will be forecast to continue  
+  * Regarding the temperature data, if there is a deterministic signal in the data, it almost assuredly is not simply a straight line  
+
+**Final Thoughts for Temperature Data**  
+
+  * All three models (ARMA, ARIMA, and signal-plus-noise) seemed to be satisfactory models from the standpoint of  
+    + Residual analysis  
+    + Realizations generated  
+  * However, the three produced strikingly different forecasts  
+  * Knowledge of the physical situation can help guide you, incorrect assumptions may lead you to the wrong conclusion  
+  * We can't stress enough:  
+  
+**Beware of results by analysts who choose a model in order to produce desired results**  
+
+#### Sunspot Data: 1749-1924 (sunspot.classic)  
+
+**Sunspot Data: Box-Jenkins Model**  
+
+The Box-Jenkins procedure involves plotting the sample autocorrelations and sample partial autocorrelations and looking for patterns.  
+Sample autocorrelations and partial autocorrelations can be obtained using base R functions:  
+```{r visualize sunspot.classic, echo=TRUE, results='hide'}
+data("sunspot.classic")
+plotts.wge(sunspot.classic)
+acf(sunspot.classic)
+pacf(sunspot.classic)
+```
+
+The two large partial autocorrelations strongly suggest an AR(2)  
+Box and Jenkins fit an AR(2) model to the data. Using MLE estimates for the AR(2) we obtain:  
+```{r}
+s2=est.ar.wge(sunspot.classic,p=2)
+#phi's
+s2$phi
+#WNV
+s2$avar
+mean(sunspot.classic)
+```
+
+$$(1-1.33B+0.65B^2)(X_t-44.78)=a_t\\ where\ \widehat{\sigma}^2_a=236$$
+
+The factor table shows that this model is associated with a pseudo-cyclic behavior with frequency $f_0=0.094$ or cycle length 1/.094=10.6 years which is consistent with the data.  
 
 
+Test with the ljung  
+```{r}
+ljung.wge(s2$res, K=24)
+ljung.wge(s2$res, K=48)
+```
 
+  *	The residuals look reasonably white  
+  *	Sample autocorrelation of the residuals stay within the 95% limit lines  
+  *	Ljung-Box did not reject the null of white noise at K=48(p-value=.21) but at K=48(p-value=.05) the conclusion of white noise is somewhat questionable  
 
+**Sunspot Data: AIC Model Selection**
 
+We next let AIC select a model for the sunspot data. We have chosen to select the best AR model using the code below:  
+```{r}
+aic5.wge(sunspot.classic,p=0:10,q=0:0)
+```
 
+AIC picks an AR(8)  
 
+The factor table shown below also has a dominant frequency associated with the 10.5 year period.  
+```{r}
+# FYI BIC selects an AR(2)
+s8=est.ar.wge(sunspot.classic,p=8)
+# s8$phi: 1.22872595 -0.47331327 -0.13807811 0.15688938 -0.14030802 0.07050449 -0.12841889 0.20692558
+# s8$avar:212.6003
+mean(sunspot.classic) # 44.78409
+```
 
+Look at the residuals  
+```{r}
+plotts.wge(s8$res)
+acf(s8$res, lag.max = 50)
+```
+```{r}
+ljung.wge(s8$res, K= 24)
+ljung.wge(s8$res, K= 48)
+```
+
+  * Again, the residuals look reasonably white
+  * Sample autocorrelation of the residuals stay within the 95% limit lines
+  * Ljung-Box did not reject the null of white noise at K=24 or at K=48with p-values of .33 and .24,respectively
+
+**11.6.5 Check**  
+Assume an AR model (q = 0) for the Sunspot data, and use aic5.wge() to estimate the top five models based on AIC. 
+(*Make sure to allow the function to search up to an AR model with p = 10.)  
+Are both an AR(2) and an AR(8) in the top five?  
+**No**  
+```{r}
+aic5.wge(sunspot.classic, p=0:10,q=0)
+```
+**11.6.6 Check**  
+What is the AIC of the AR(8) fit? Express your response rounded to four decimals.  
+**$value [1] 5.461687**  
+```{r}
+aic.wge(sunspot.classic, p=8, q=0)
+```
 
 
 
@@ -303,7 +590,3 @@ The computer will want "YES" but the answer is actually "NO" since the pvalue in
 
 11.6.2
 The model specification in the video is listed as .33 instead of 1.33 (missing the 1.)
-
-
-
-

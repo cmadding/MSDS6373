@@ -8,7 +8,12 @@ output: html_document
 # Non Stationary 
 ## Seasonal ARMA(3,0) s = 10
 ```{r}
-SS = read.csv(file.choose(),header = TRUE)
+
+library(readr)
+library(tswge)
+
+SS <- read_delim("Sunspot Numbers Thru 2019.csv", 
+    ";", escape_double = FALSE, trim_ws = TRUE)
 
 plotts.sample.wge(SS$SunSpots)
 est.ar.wge(SS$SunSpots,p = 12) #overfit for seasonality
@@ -83,7 +88,7 @@ plot(SpecDen$freq,SpecDen$pzgram, type = "l", lwd = 6)
 
 for( i in 1: sims)
 {
-   SpecDen2 = parzen.wge(gen.aruma.wge(289,s = 10, phi = ARMA31$phi, theta = ARMA31$theta, plot = "FALSE"), plot = "FALSE")
+   SpecDen2 = parzen.wge(gen.aruma.wge(289,s = 10, phi = AR2$phi, theta = AR2$theta, plot = "FALSE"), plot = "FALSE")
    lines(SpecDen2$freq,SpecDen2$pzgram, lwd = 2, col = "red")
 }
 
@@ -95,13 +100,13 @@ plot(ACF$lag ,ACF$acf , type = "l", lwd = 6)
 
 for( i in 1: sims)
 {
-   ACF2 = acf(gen.aruma.wge(289, s = 10, phi = ARMA31$phi, theta = ARMA31$theta, plot =    "FALSE"), plot = "FALSE")
+   ACF2 = acf(gen.aruma.wge(289, s = 10, phi = AR2$phi, theta = AR2$theta, plot =    "FALSE"), plot = "FALSE")
    lines(ACF2$lag ,ACF2$acf, lwd = 2, col = "red")
 }
 
 #Compare Generated Realizations 
 
-S11ARMA31gen = gen.aruma.wge(160,s = 11,phi = ARMA31$phi, theta = ARMA31$theta, vara = ARMA31$avar)
+S11ARMA31gen = gen.aruma.wge(160,s = 11,phi = AR2$phi, theta = AR2$theta, vara = AR2$avar)
 
 plotts.sample.wge(S11ARMA31gen + mean(SS$SunSpots))
 

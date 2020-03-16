@@ -1,0 +1,240 @@
+---
+title: "Unit 11 For Live Session"
+author: "Chad Madding"
+date: "March 15, 2020"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      results = "show")
+library(readr)
+library(tswge)
+library(tseries)
+library(forecast)
+```
+
+## Unit 11 For Live Session
+
+**In preparation for the live session, please complete the following. Be sure and submit your work to the "Unit 11: "For Live Session" Assignment" assignment on 2DS:**  
+
+Please address each activity on at least one PowerPoint slide and submit via the online campus.
+Our purpose is to update the Sunspot analysis. Download the most current yearly mean sunspot data and with this data:  
+
+####1. Plot the data.  
+```{r, echo=FALSE, results='hide'}
+SS = read_delim("Sunspot Numbers Thru 2019.csv", 
+    ";", escape_double = FALSE, trim_ws = TRUE)
+
+#Convert to a time series
+SS = ts(SS$SunSpots, start = 1700, end = 2019)
+#A simple plot of the data
+plot(SS)
+#Plot Data, Sample Autocorrelations, Periodogram, and Parzen Spectral Estimate
+plotts.sample.wge(SS, arlimits = TRUE)
+```
+
+####2. Comment on its stationarity.  
+Sample autocorrelations damp quickly and seem to indicate stationarity. A unit root test also shows stationarity. With a frequency peek at 0.0937 there does seem to be some seasonality in the data (1/0.937=10.67).  
+```{r stationarity, echo=FALSE, results='hide'}
+acf(SS)
+pacf(SS)
+```
+```{r}
+adf.test(SS)
+```
+
+####3. Use aic5.wge to estimate the p and q of the model. You may use your choice of AIC/AICC/BIC.  
+```{r aic5}
+#Checking the AIC options
+aic5.wge(SS,p=0:15,q=0:2,type="aic")
+aic5.wge(SS,p=0:15,q=0:2,type="aicc")
+aic5.wge(SS,p=0:15,q=0:2,type="bic")
+```
+All the AIC's point to and AR(9).  
+
+```{r Forcast package}
+#playing around with the Forcast package to see what it picks
+#differencing needed to stationarize the series
+ndiffs(SS)
+SSAA=auto.arima(SS,stepwise = FALSE,  approximation=FALSE, seasonal = TRUE, stationary = TRUE)
+SSAA
+forecast(SSAA, h=15)
+```
+
+####4. Fit the model using your model identification (p and q). You may use any of the estimates you like (maximum likelihood, Yule-Walker, Burg).  
+I am choosing to go with the AR(3) model from the auto.arima.  
+```{r Fit the model}
+#Maximum Likelihood Estimation
+SS3.mle=est.ar.wge(SS,p=3,type='mle')
+mean(SS) #[1] 78.735
+SS3.mle$avar #[1] 644.4032
+#Yule Walker Estimate
+#SS.yw=est.ar.wge(SS,p=9,type='yw')
+#Burg Estimates
+#SS.burg=est.ar.wge(SS,p=9,type='burg')
+```
+
+** Final AR(3) model**  
+
+$$(1-1.28B+0.49B^2+0.14B^3)(x_t-78.74)=a_y\  \sigma^2_a=644.4$$
+
+####5. Use this model to generate an ASE from forecasting the last 15 years of sunspot data.  
+
+The maximum likelihood scored just a bit better so I decided to stay with it's forecast.  
+
+```{r generate an ASE}
+SS3.mle.est = fore.arma.wge(SS, phi = SS3.mle$phi, theta = 0,lastn = T, n.ahead = 15)
+SS3.mle.ase = mean((SS[(320-15+1):320] - SS3.mle.est$f)^2)
+SS3.mle.ase
+#SS.mle.est = fore.arma.wge(SS, phi = SS.mle$phi, theta = 0,lastn = T, n.ahead = 15)
+#SS.mle.ase = mean((SS[(320-15+1):320] - SS.mle.est$f)^2)
+#SS.mle.ase
+#SS.yw.est = fore.arma.wge(SS, phi = SS.yw$phi, theta = 0,lastn = T, n.ahead = 15)
+#SS.yw.ase = mean((SS[(176-15+1):176] - SS.yw.est$f)^2)
+#SS.yw.ase
+#SS.burg.est = fore.arma.wge(SS, phi = SS.burg$phi, theta = 0,lastn = T, n.ahead = 15)
+#SS.burg.ase = mean((SS[(176-15+1):176] - SS.burg.est$f)^2)
+#SS.burg.ase
+```
+
+####6. Now fit a seasonal model to the Sunspot data (you pick the value of s), and find the ASE for this model using the last 15 years of sunspot data.  
+
+**Non Stationary**  
+
+```{r}
+SS.overfit=est.ar.wge(SS,p = 12) #overfit for seasonality
+```
+
+```{r known 11 table}
+#(1-B^11)
+factor.wge(c(rep(0,11),1))
+```
+#### Transform  
+
+Base on the overfit table we can now transform the data to remove the seasonality.  
+
+Transform data to create $Y_t=(1-B^{11})X_t$  
+
+```{r Transform data s 11}
+#rep will repeat the 11 zeros then we can add a one at the end
+SS_11 = artrans.wge(SS,phi.tr = c(rep(0,10),1))
+```
+
+The transformed data appear stationary, so we use AIC to identify a model.
+
+We use **aic5.wge** to model the transformed data  
+When using AIC to model data that has been stationarized using the seasonal transform $(1-B^{11})$, it is good practice to allow a range of p values to include s to uncover any seasonal stationary information that might be in the data.
+
+```{r}
+aic5.wge(SS_11)
+aic5.wge(SS_11, type = "bic")
+```
+
+**Seasonal ARMA(2,0) s = 11**  
+
+AIC selects an AR(2,0) model. Factoring the ARMA(2,0) model we obtain:  
+
+```{r est the y}
+AR2 = est.arma.wge(SS_11,p = 2,q = 0)
+```
+
+```{r transform and check whitness}
+SS_11_AR2 = artrans.wge(SS_11,AR2$phi)
+ljung.wge(SS_11_AR2)
+ljung.wge(SS_11_AR2, K = 48)
+```
+
+```{r forcast with s11}
+f = fore.aruma.wge(SS,s = 11,phi = AR2$phi,n.ahead = 15,limits = F,lastn = TRUE)
+
+SS_11_AR2.ASE = mean((SS[(length(SS)-14):length(SS)] - f$f)^2)
+
+SS_11_AR2.ASE
+```
+
+####7. Describe which model you prefer, and why.  
+
+The best model turned out to be the AR(3) that auto.arima from the Forecast package picked. The ASE was also lower than the seasonal model. This was a stationary model to start with and that could have lead to the better performance.  
+
+####8. Use your best model (the one you choose) to forecast the next 10 years of sunspot data.  
+
+**Final AR(3) model**  
+  
+$$(1-1.28B+0.49B^2+0.14B^3)(x_t-78.74)=a_y\  \sigma^2_a=644.4$$  
+
+```{r Final Forecasts}
+SS3.f = fore.arma.wge(SS,phi = SS3.mle$phi,theta = 0, n.ahead = 10,limits = F, lastn = F)
+```
+
+#### Analysis of AcuSpike Web Hits
+
+Given what you have learned so far, model the Accuspike web page hits data, and provide the desired forecasts.  
+This does not need to be a formal analysis with a write-up.  
+You should be able to explore the data, identify a model, estimate the model, judge the appropriateness of the model, and provide the forecasts.  
+
+#### Plot the Data
+```{r read in accuspike}
+AS = read.csv("accuspike.csv",header = TRUE)
+#Convert to a time series
+AS = ts(AS$Active.Users)
+```
+
+```{r}
+#A simple plot of the data
+plot(AS)
+#Plot Data, Sample Autocorrelations, Periodogram, and Parzen Spectral Estimate
+plotts.sample.wge(AS, arlimits = TRUE)
+```
+
+Sample autocorrelations damp quickly and seem to indicate stationarity. A unit root test also shows stationarity. With a frequency peek around 0.15 (1/0.15=6.67) there could be some weekly seasonality in the data.  
+
+```{r AS stationarity, echo=FALSE, results='hide'}
+acf(AS)
+pacf(AS)
+```
+
+```{r}
+adf.test(AS)
+```
+
+```{r AS aic5}
+#Checking the AIC options
+aic5.wge(AS)
+```
+
+```{r accuspike Forcast package}
+#Use the Forcast package to see what it picks
+#differencing needed to stationarize the series
+ndiffs(AS)
+ASAA=auto.arima(AS,stepwise = FALSE,  approximation=FALSE)
+ASAA
+ASAA.f=forecast(ASAA, h=14)
+```
+
+The forecast package picked a ARMA(4,1) and that matches one to the AIC5's so we will be using the (4,1).
+```{r AS Fit the model}
+#Fit with 4,1
+AS41=est.arma.wge(AS,p=4,q=1,factor = TRUE)
+AS41$phi #[1]  1.3614265 -0.5113544 -0.1158767  0.2080940
+AS41$theta #[1] 0.6585371
+mean(AS) #[1] 80.35
+AS41$avar #[1] 386.29
+```
+
+**Final ARMA(4,1) model**  
+
+$$(1-1.36B+0.51B^2+0.12B^3-0.21B^4)(x_t-80.35)=(1-0.66B)a_y\  \sigma^2_a=386.29$$
+Forecast out two weeks
+
+```{r AS Final Forecasts}
+AS41.f = fore.arma.wge(AS,phi = AS41$phi,theta = AS41$theta, n.ahead = 14,limits = F, lastn = F)
+```
+
+```{r compare the 2 forcast}
+AS41.f$f
+ASAA.f
+plot(ASAA.f)
+```

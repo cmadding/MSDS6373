@@ -10,7 +10,9 @@ output: html_document
 ## Plot the Data
 ```{r}
 
-AS = read.csv(file.choose(),header = TRUE)
+library(readr)
+AS <- read_csv("accuspike.csv")
+#AS = read.csv(file.choose(),header = TRUE)
 plotts.sample.wge(AS$Active.Users)
 
 ```
@@ -62,9 +64,7 @@ for( i in 1: sims)
 }
 
 #Make Final Forecasts
-f = fore.aruma.wge(AS2$Active.Users,phi = ARMA81$phi, theta = ARMA81$theta, n.ahead = 10,limits = T, lastn = F)
-
+as.f = fore.aruma.wge(AS2$Active.Users,phi = ARMA81$phi, theta = ARMA81$theta, n.ahead = 10,limits = T, lastn = F)
 ```
-
 
 data = gen.aruma.wge(1000, d = 1)
