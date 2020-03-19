@@ -1,0 +1,445 @@
+---
+title: "Unit 12"
+author: "Chad Madding"
+date: "March 18, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 999)
+library(readr)
+library(tswge)
+library(dplyr)
+library(vars)
+```
+
+## Multiple Regression with Correlated Errors  
+
+In the following R code, y denotes the realization Y_t, z denotes Z_t, and x1,..., xm denote Xt_1,...,X_tm  
+
+**Step 1:** Perform a regression analysis and model the residuals (should be uncorrelated and normal distributed). The following is example code (with m=3):  
+
+```{r ksfit}
+#ksfit=lm(y~x1+x2+x3)
+#phi=aic.wge(ksfit$residuals,p=0:8)
+```
+
+**Step 2:** Use function ARIMA to perform the MLE analysis which estimates the coefficients in the multiple regression while simultaneously modeling Z_t as AR(phi$p)  
+
+```{r}
+#fit=arima(sales,order=c(p=phi$p,d=0,q=0),xreg=cbind(x1,x2,x3))
+```
+
+**fit$coef** contains the AR coefficients, the constant, and the coefficients on x1, x2, and x3
+
+The command
+
+**fit**
+produces the following example “dummy” output (assuming phi$p=2)  
+
+    Coefficients:  
+          ar1      ar2   intercept    x1     x2     x3  
+          1.6     -0.8    10.5       2.3    3.1    0.3  
+    s.e.  0.6      0.3     2.2       0.9    1.2    0.2  
+    sigma2 estimated as 1.4: log likelihood=-16,aic=20.1  
+
+  * Recall that we don’t usually look at the SE’s for AR and MA coefficients (the factor table gives more information).   
+  * Function arima doesn’t give p-values, but in general if the absolute value of the coefficient is over two times the SE, this is evidence at the .05 level that the variable is useful.  
+  * The final model residuals are given in **fit$resid**, and they should be white  
+    + Check with residual plots and/or **Ljung-Box Test**.  
+  * Compare competing models with **AIC/AIC/BIC** etc.  
+  * Use the model to forecast and/or answer any additional Questions Of Interest (QOI's).  
+
+
+## Sales Example
+
+We are interested identifying variables that impact sales (Y).  
+Variables we consider are (data in file BusinessSales.csv)  
+    *TV advertising expenditures (𝑋_1) (variable ad_tv)
+    *Online advertising expenditures (𝑋_2) (ad_online)
+    *Discount on product (𝑋_3) (variable discount)
+    
+We have data for the past 100 weeks. That is, for each variable, we have a time series realization of length n =100 (weeks):  
+
+    sales:  (x $10,000)  
+    ad_tv:  (x $10,000)  
+    ad_online:  (x $10,000)  
+    discount:  (% discount)  
+    
+**Output time series multiple regression analysis**  
+```{r read in business data, echo=FALSE}
+BSales <- read.csv("businesssales.csv", header = TRUE)
+
+# All data with no lag and no trend
+ksfit=lm(sales~ad_tv+ad_online+discount, data = BSales)
+aic.wge(ksfit$residuals,p=0:8, q=0)  # AIC picks p=7
+fit=arima(BSales$sales,order=c(7,0,0),xreg=BSales[,3:5])# Coloum 3, 4 and 5 are the variables
+fit
+```
+  **Multiple regression equation**
+$$sales=54.55+.07(ad_{tv})-.09(online_{ad})-.15(discount)$$
+
+```{r acf residuals}
+acf(fit$residuals)
+```
+
+```{r Ljung_Box Test}
+#run the Ljung_Box Test
+ltest = ljung.wge(fit$resid)
+#One way to Disable Scientific Notation
+format(ltest$pval, scientific = FALSE)
+```
+There is strong evidence that the residuals are serially correlated. 
+
+ASE for model with no lag and no trend (last 5)
+```{r}
+# ASE for model with no lag and no trend (last 5)
+BSales2 = BSales[1:95,]
+ksfit=lm(sales~ad_tv+ad_online+discount, data = BSales2)
+aic.wge(ksfit$residuals,p=0:8, q=0)  # AIC picks p=7
+fit=arima(BSales2$sales,order=c(7,0,0),xreg=cbind(BSales2$ad_tv,BSales2$ad_online,BSales2$discount))
+fit
+```
+
+  * The errors in the standard multiple regression satisfy an AR(7) and are correlated  
+
+  * None of the variables ad_tv, ad_online, or discount are significantly different from zero  
+
+  * The final model residuals are not white (fit$resid)  
+
+
+```{r}
+preds = predict(fit, newxreg = cbind(BSales$ad_tv[96:100],BSales$ad_online[96:100],BSales$discount[96:100]))
+ASE1 = mean((BSales$sales[96:100] - preds$pred)^2)
+ASE1
+```
+
+```{r}
+#dev.off()
+plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
+lines(seq(96,100,1), preds$pred, type = "l", col = "red")
+```
+
+These results are not very enlightening (or encouraging)
+
+Let’s try adding a trend term to the model
+
+##Add a trend term (t=week) to the model
+```{r trend term}
+t=1:100
+ksfit=lm(sales~t+ad_tv+ad_online+discount, data = BSales)
+aic.wge(ksfit$residuals,p=0:8,q=0:0)  # AIC picks p=6
+fit=arima(BSales$sales,order=c(6,0,0),xreg=cbind(t,BSales[,3:5]))
+fit
+```
+
+**time (week) is significant, other variables are not**  
+
+ **Multiple regression equation**  
+$$sales=51.92+.05(week)+.11(ad_{tv})-.05(online_{ad})-.17(discount)$$
+
+  * Again the errors in the standard multiple regression satisfy an AR(6) and are correlated  
+  * Time was significant (with positive slope) so it seems that sales are increasing with time  
+  * None of the variables ad_tv, ad_online, or discount are significantly different from zero  
+  * The final model residuals are not white  
+
+There is strong evidence that the residuals are serially correlated. 
+
+ **Summary:**  
+
+Let’s keep working on this!
+
+#### How About Using Lagged Variables?  
+
+Advertising for the week didn’t seem to predict sales for that week  
+
+  * It could be that advertising has a “lag” effect  
+
+  * That is, advertising for the current week may have more effect on sales next week than this week  
+
+We next considered a multiple regression in which the “advertising variables at time t” are actually costs for the previous week  
+
+  * These will be denoted **ad_tv1** and **ad_online1**  
+  
+  * The new variables will be  
+
+    + ad_tv1[t]=ad_tv[t-1]  
+
+    + ad_online1[t]=ad_online[t-1]  
+
+**Example:** How to create lagged variables in R
+
+```{r}
+#Explicitly
+#Example:
+#With dplyr lag function
+df = data.frame(Y = c(1,1,2,3,4,4,5,8),X1 = c(5,6,6,7,7,8,8,9))
+df$X1_L1 = dplyr::lag(df$X1,1)
+df$X1_L2 = dplyr::lag(df$X1,2)
+df
+```
+
+####12.2.5 Consept Check  
+
+Using sales data set, use R to lag (k = 1) the TV Advertising and Online Advertising data.  
+Add those lagged columns to the Business data frame.  
+  
+```{r lag 1}
+ad_tv1 = dplyr::lag(BSales$ad_tv,1)
+ad_online1 = dplyr::lag(BSales$ad_online,1)
+discount = BSales$discount
+BSales$ad_tv1= ad_tv1
+BSales$ad_online1 = ad_online1
+head(BSales)
+```
+
+```{r}
+ksfit=lm(sales~ad_tv1+ad_online1+discount, data = BSales)
+aic.wge(ksfit$residuals,p=0:8,q=0:0)  # AIC picks p=7
+fit=arima(BSales$sales,order=c(7,0,0),xreg=cbind(ad_tv1, ad_online1, discount))
+fit
+```
+
+#### 12.3 Multivariate Regression with Correlated Errors, Part II  
+
+Generate lagged variables.
+```{r}
+ad_tv1 = dplyr::lag(BSales$ad_tv,1)
+ad_online1 = dplyr::lag(BSales$ad_online,1)
+discount = BSales$discount
+BSales$ad_tv1= ad_tv1
+BSales$ad_online1 = ad_online1
+head(BSales)
+```
+Fit the lagged variables with a Multivariate regression.  
+```{r}
+ksfit=lm(sales~ad_tv1+ad_online1+discount, data = BSales)
+aic.wge(ksfit$residuals,p=0:8,q=0:0)  # AIC picks p=7
+#Fit using the AIC information
+fit=arima(BSales$sales,order=c(7,0,0),xreg=cbind(ad_tv1, ad_online1, discount))
+fit
+```
+
+both “ad” variables are highly significant.  
+3.43/.6 and 8.1/1.24. Far away from zero and larger standard error.  
+
+Now let look at adding a time trend.
+```{r}
+t=1:100
+ad_tv1 = dplyr::lag(BSales$ad_tv,1)
+ad_online1 = dplyr::lag(BSales$ad_online,1)
+BSales$ad_tv1= ad_tv1
+BSales$ad_online1 = ad_online1
+
+#fit the model
+ksfit=lm(sales~t + ad_tv1+ad_online1+discount, data = BSales)
+aic.wge(ksfit$residuals,p=0:8,q=0:0)  # AIC picks p=7
+fit=arima(BSales$sales,order=c(7,0,0),xreg=cbind(t, ad_tv1, ad_online1, discount)) #sales is the responce variable
+fit
+```
+
+The AIC is lower in the model with the Time trend so the AIC favors the one with trend. 
+
+**Lagged "ad" variables and trend:**  
+
+$$Sales=\beta_0+\beta_{1t}+\beta_2ad_tv_{t-1}+\beta_3ad_online{t_1}+\beta_4discount_t+Z_t\ Z_t\ is\ AR(7)$$
+
+
+Time is somewhat significant, around 2 if we divide (.0065/.0038=1.71). The two ad's are still very significant, and the discount is not significant.  
+  
+**Results:**  
+
+  * Again, the errors in the standard multiple regression are correlated so we used an AR(7).  
+  * Discount was not significant with or without trend in the model.  
+  * Lagged variables **ad_tv1** and **ad_online1** were highly significant.  
+  * In the presence of the lagged variables, time (trend) was not significant (although favored by AIC).  
+  * The final model residuals (with trend) are white: 
+  
+```{r ljung box test with lag}
+ltest = ljung.wge(fit$resid)
+ltest$pval
+```
+There is not enough evidence to suggest that the residuals are serially correlated.  
+
+**Summary:**  
+Advertising effects seem to be delayed
+
+The preceding example makes an important point regarding lagged variables in multiple regression.
+
+$$Y_t=\beta_1X_{t1}+\beta_2X_{t2}+...+\beta_mX_{tm}+Z_t$$  
+
+**Note from the model:**  
+  * All independent variables and the dependent variable are evaluated at the same time$t$.  
+    + This “restriction” seems to eliminate the use of lagged relationships in the multiple regression model.  
+  * However, using the technique employed in the sales example, you can let, for example,$X_{t1}$, actually denote the TV-ad expenditures at time $t-1$.  
+  * This technique allows for identifying “lagged” relationships although the model itself seems to not allow them.  
+
+**Point to remember:**  
+Don’t forget to consider lagged information.  
+
+**Concept Check 12.3.2** 
+
+We fit a multiple regression model to the data as we usually would, assuming the errors are not serially correlated. This includes any lagged variables we suspect are present. We then model the residuals from that model with an AR or ARMA process and proceed to find the MLE estimates from an ARIMA fit.  
+
+### Cross-Correlation  
+
+**Cross-Correlation between 2 Time Series**  
+
+A useful tool for detecting the existence of “lagged relationships” in multivariate time series analysis is the *cross-correlation function*.  
+
+The “cross-correlation” between variables $X_{t1}$ and $X_{t2}$ at lag $k$ is the *correlation between* $X_{t,1}$ and $X_{t+k,2}$.  
+
+We find the cross-correlation at lag k using the ordered pairs.
+
+Function **ccf** computes the cross-correlation or cross-covariance of two univariate series.  
+
+```{r ccf def}
+#ccf(x, y, lag.max = NULL, type = c("correlation", "covariance"),
+#  plot = TRUE, na.action = na.fail, ...)
+```
+
+**Note:**  
+
+In order to find the cross-correlation between x1 and x2 using the definition in this classes textbook use the statement ccf(x2,x1).  
+
+**Concept Check 12.3.4**  
+
+Consider the attached data set in WhatIsTheLag.csv. Use the cross-correlation function (ccf()) to find evidence of the lag in which X1 is related to Y. That is, which k has the most evidence of Xt-k being related to Yt?  
+
+WELL, looks like there is a bit of correlation at k=3.  
+
+Below you will find the graph indicating why k = 3 provides the most evidence suggesting a relationship between Xt-k and Yt.  
+```{r read in whatisthelag}
+#read in the data
+whatisthelag <- read.csv("whatisthelag.csv", header = TRUE)
+#check out the first few lines
+head(whatisthelag)
+#check for any corrrleation between Y and X1
+ccf(whatisthelag$Y,whatisthelag$X1)
+```
+
+####Vector AR(VAR)  
+
+**Simultaneously modeling several time series**  
+
+In the multiple regressions with correlated errors we did not take into account the possible correlation structure within and among the independent variables.  
+
+
+In this setting there is no distinction between dependent and independent variables.
+Our goal is to see how the interrelationships among the variables help with such things as forecasting one or more of the variables..  
+
+  * First subscript is time  
+  * Second subscript is variable number  
+
+###VAR  
+
+Bivariate VAR(1):  
+
+Two variables: $X_{t1}$ and $X_{t2}$
+The value of $X_{t1}$ and $X_{t2}$ invlove lag one values $X_{t-1,1}$ and $X_{t-1,2}$
+
+Bivariate VAR(2)  
+
+**Note that:**  
+
+   * Clearly, writing the equations in expanded form will get very cumbersome very quickly for higher order models and more than two variables  
+   * We use R functions!  
+   * CRAN package **vars** is particularly useful  
+
+####Forecasting with VAR Models
+
+Forecasting with VAR(p) models is simply an extension of forecasting with AR(p) models  
+
+**Example:**  
+
+```{r}
+x1.25=c( -1.03,  0.11, -0.18, 0.20, -0.99, -1.63, 1.07,  2.26, -0.49, -1.54,  0.45,  0.92,
+         -0.05, -1.18,  0.90,  1.17,  0.31,  1.19,  0.27, -0.09,  0.23, -1.91,  0.46,  3.61, -0.03)
+x2.25=c( -0.82,  0.54,  1.13, -0.24, -0.77,  0.22,  0.46, -0.03, -0.59,  0.45,  0.59,  0.15,
+         0.60,  0.13, -0.04,  0.12, -0.96,  0.23,  1.81, -0.01, -0.95, -0.55, -0.15,  0.71,  0.90)
+#only use 20 to fit that way we can use the last 5 to check our forcast
+x1=x1.25[1:20]
+x2=x2.25[1:20]
+```
+Recall a univarate forcast with the data above  
+
+```{r recall univ}
+p1=aic.wge(x1,p=0:8,q=0:0)
+# aic picks p=2
+x1.est=est.ar.wge(x1,p=p1$p)
+fore.arma.wge(x1,phi=x1.est$phi,n.ahead=5,lastn=FALSE,limits=FALSE)
+p2=aic.wge(x2,p=0:8,q=0:0)
+# aic picks p=2
+x2.est=est.ar.wge(x1,p=p2$p)
+fore.arma.wge(x2,phi=x2.est$phi,n.ahead=5,lastn=FALSE,limits=FALSE)
+```
+
+Vector Autoregressive Models to use coralation to improve the forcast.  
+
+Using multivariet to forcast  
+
+```{r}
+#install.packages("vars")
+# VAR and VARselect are from CRAN package vars
+X=cbind(x1,x2)
+head(X)
+VARselect(X, lag.max = 6, type = "const",season = NULL, exogen = NULL)
+#VARselect picks p=5 (using AIC)
+lsfit=VAR(X,p=5,type="const")
+preds=predict(lsfit,n.ahead=5)
+# preds$fcst$x1[1,1] - [5,1] are the VAR forecasts for x1.  Similar for x2
+#this will list out just the forcast
+preds$fcst$x1[1:5,1]
+```
+
+**Concept check 12.4.4**  
+
+Using the code above from the VAR example: 
+
+Note that the VAR model results were stored in a variable named “lsfit.”
+Find the details of the model by entering “summary(lsfit).” 
+There is strong evidence that the X1 variable is related to X2 variable but not at the current time period.
+
+```{r summary(lsfit)}
+summary(lsfit)
+```
+
+What lag of X2 is most associated with X1t? (Express your response as a whole number.)  
+
+**5**
+
+What is the p-value that is reflecting the strength of that association? (Express your response rounded to nine decimal places.)
+
+**.000000031**  
+
+
+####Univariate Forecasts  
+
+What Happened?  
+
+Why are the forecasts for x1 so good?  
+Let’s look at the data again.  
+
+x1(t) is essentially a scaled version of 2*x2(t-5)  
+```{r}
+a = ccf(x2.25,x1.25)
+```
+
+After running the R code for VAR modeling, if you type lsfit you obtain the following output:  
+```{r}
+lsfit
+```
+
+**Note:**  
+
+In the formula for $X_{t1}$, the coefficient of $X_{t-5,2}$ (**x2.l5**) is about **two** while all other coefficients are approximately zero.  
+
+Plot the forcast:  
+```{r}
+library(RColorBrewer)
+fanchart(preds, colors = brewer.pal(n = 8, name = "Blues")) # Change color pallet to make distinguishable.
+```
+
+
+

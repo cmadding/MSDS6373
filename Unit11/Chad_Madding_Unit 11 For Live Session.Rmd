@@ -49,11 +49,12 @@ adf.test(SS)
 ####3. Use aic5.wge to estimate the p and q of the model. You may use your choice of AIC/AICC/BIC.  
 ```{r aic5}
 #Checking the AIC options
-aic5.wge(SS,p=0:15,q=0:2,type="aic")
-aic5.wge(SS,p=0:15,q=0:2,type="aicc")
-aic5.wge(SS,p=0:15,q=0:2,type="bic")
+aic.wge(SS,type="bic")
+aic5.wge(SS,p=0:10,q=0:2,type="aic")
+aic5.wge(SS,p=0:10,q=0:2,type="aicc")
+aic5.wge(SS,p=0:10,q=0:2,type="bic")
 ```
-All the AIC's point to and AR(9).  
+All the AIC's point to and AR(9). The BIC shows an AR(3).  
 
 ```{r Forcast package}
 #playing around with the Forcast package to see what it picks
@@ -86,7 +87,7 @@ $$(1-1.28B+0.49B^2+0.14B^3)(x_t-78.74)=a_y\  \sigma^2_a=644.4$$
 The maximum likelihood scored just a bit better so I decided to stay with it's forecast.  
 
 ```{r generate an ASE}
-SS3.mle.est = fore.arma.wge(SS, phi = SS3.mle$phi, theta = 0,lastn = T, n.ahead = 15)
+SS3.mle.est = fore.arma.wge(SS, phi = SS3.mle$phi, theta = 0,lastn = T, n.ahead = 15, limits = F)
 SS3.mle.ase = mean((SS[(320-15+1):320] - SS3.mle.est$f)^2)
 SS3.mle.ase
 #SS.mle.est = fore.arma.wge(SS, phi = SS.mle$phi, theta = 0,lastn = T, n.ahead = 15)
@@ -108,8 +109,8 @@ SS3.mle.ase
 SS.overfit=est.ar.wge(SS,p = 12) #overfit for seasonality
 ```
 
-```{r known 11 table}
-#(1-B^11)
+```{r known 12 table}
+#(1-B^12)
 factor.wge(c(rep(0,11),1))
 ```
 #### Transform  
