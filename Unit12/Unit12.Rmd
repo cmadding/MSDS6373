@@ -441,5 +441,89 @@ library(RColorBrewer)
 fanchart(preds, colors = brewer.pal(n = 8, name = "Blues")) # Change color pallet to make distinguishable.
 ```
 
+**Note:**  The margin or error for the x1 variable is so small that the forecasts and the upper and lower limits are nearly overlapped. We used the RColorBrewer package to change the colors to be more distinguishable.  
+
+
+**Comments about the Bivariate VAR(5) Example**  
+
+This example was constructed to show how one variable in a VAR model can be a leading indicator for another variable.  
+
+Because variable $X_{t1}=2X_{t-5,2}$, we would expect the VAR forecasts to somehow take advantage of this fact.  
+**Notice that:**  
+
+  * Both $X_{t1}$ and $X_{t2}$ were generated as AR(2) processes.  
+  * AIC applied to each series separately picked an AR(2).  
+  * Function **VARselect** identified the VAR model as a VAR(5).  
+    + It was necessary that **p** was at least **5** so that lag 5 would be in the fitted model  
+    + AIC detected this “by itself”  
+    + The fitted **VAR(5)** model gave essentially perfect forecasts for $X_{t1}$ for steps ahead to 5  
+    + The forcast for $X_{t2}$ showed no detectable improvement over the univariate forecasts.  
+
+####12.5 Melanoma and Sunspot Example  
+Melanoma Sunspot Example Annual Data: 1936-1972  
+
+This data set has caused interest because of the fact that there is some evidence that the melanoma incidence at year $t$ is related to the sunspot number at year $t-2$.  
+
+The “peak” at -2 suggests that sunspot number at time t-2 is related to melanoma at time t  
+But, note that the “peak” is within the error bars for zero cross-correlations  
+
+  * Relationship may not be strong
+
+We know data out to t=1972  
+We will perform analysis based on data only up to t=1967  
+```{r}
+# melanoma incidence and sunspot numbers 1936-1972
+ melanoma=c(1.0, 0.9, 0.8, 1.4, 1.2, 1.0, 1.5, 1.9, 1.5, 1.5, 1.5, 1.6, 1.8, 2.8, 2.5, 2.5, 2.4, 2.1, 1.9, 2.4, 2.4, 2.6, 2.6, 4.4, 4.2, 3.8, 3.4, 3.6, 4.1, 3.7, 4.2, 4.1, 4.1, 4.0, 5.2, 5.3, 5.3)
+sunspot=c(40, 115, 100,  80,  60,  40,  23,  10,  10,  25,  75, 145, 130, 130,  80,  65,  20,  10,   5,  10, 60, 190, 180, 175, 120,  50,  35,  20,  10,  15,  30,  60, 105, 105, 105,  80,  65)
+#We know data out to t=1972  
+#We will perform analysis based on data only up to t=1967  
+mel.67=melanoma[1:32]
+sun.67=sunspot[1:32]
+```
+
+AIC and modeling  
+```{r}
+# AIC to pic the model
+p.mel=aic.wge(mel.67,p=0:8,q=0:0)
+p.mel$p
+# estimate
+mel.est=est.ar.wge(mel.67,p=p.mel$p)
+# forcast
+fore.arma.wge(mel.67,phi=mel.est$phi,n.ahead=5,lastn=FALSE,limits=FALSE)
+# AIC to pic the model
+p.sun=aic.wge(sun.67,p=0:8,q=0:0)
+p.sun$p
+# estimate
+sun.est=est.ar.wge(sun.67,p=p.sun$p)
+# forcast
+fore.arma.wge(sun.67,phi=sun.est$phi,n.ahead=5,lastn=FALSE,limits=FALSE)
+```
+
+VAR and VARselect are from CRAN package vars  
+```{r}
+# VAR and VARselect are from CRAN package vars
+X=cbind(mel.67,sun.67)
+VARselect(X, lag.max = 6, type = "const",season = NULL, exogen = NULL) #AIC = 5.04
+#VARselect picks p=4 (using AIC)
+lsfit=VAR(X,p=4,type='const')
+preds=predict(lsfit,n.ahead=5)
+#preds$fcst$mel[1,1]-[5,1] are the VAR forecasts formenlanoma.  Similar for sunspot.
+```
+
+Plot the forcast  
+```{r}
+plot(seq(1,37,1),melanoma, type = "b", ylim = c(0,6))
+points(seq(33,37,1),preds$fcst$mel.67[1:5,1],type = "b", pch = 15)
+fanchart(preds)
+```
+
+
+
+
+
+
+
+
+
 
 

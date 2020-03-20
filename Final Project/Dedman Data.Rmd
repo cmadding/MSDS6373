@@ -151,12 +151,6 @@ HTurn3 %>%
   theme_economist()+
   scale_colour_economist()+
   ggtitle('Hourly Card Swipes for Turnstile 3')
-
-#15 minute counts
-df15 = count(SMUSwipe, Minutes_15)
-df15Turn1 = count(SMUSwipeTurn1, Minutes_15)
-df15Turn2 = count(SMUSwipeTurn2, Minutes_15)
-df15Turn3 = count(SMUSwipeTurn3, Minutes_15)
 ```
 Looks like turnstile 3 gets used more than the others but the pattern of usage looks the same accross each.  
 
@@ -175,15 +169,10 @@ summary(IDCount$n)
 count(IDCount)
 ```
 
-Convert the hourly and 15 minute data to time series.
+Convert the hourly data to time series.
 ```{r}
 #Hourley data
 AnonDataTurnstile = ts(df$n)
-#15 min-break data
-AnonDataTurnstile_15 = ts(df15$n)
-AnonDataTurnstile1_15 = ts(df15Turn1$n)
-AnonDataTurnstile2_15 = ts(df15Turn2$n)
-AnonDataTurnstile3_15 = ts(df15Turn3$n)
 ```
 
 ####Visualize what we have so far.
@@ -193,40 +182,11 @@ AnonDataTurnstile3_15 = ts(df15Turn3$n)
 #Plot the hourly data
 TurnPlotHour=plotts.sample.wge(AnonDataTurnstile)
 ```
-####Plot the 15 minute data
-
-**15 minute data for all three turnstiles**
-```{r Visualize turn all 3, echo=T, results='hide'}
-#Plot the 15 minute data
-TurnPlotAll15=plotts.sample.wge(AnonDataTurnstile_15)
-```
-
-**15 minute data for turnstile one**
-```{r Visualize turn one 15, echo=T, results='hide'}
-#Plot the 15 minute data
-TurnPlot1=plotts.sample.wge(AnonDataTurnstile1_15)
-```
-
-**15 minute data for turnstile two**
-```{r Visualize turn 2 15, echo=T, results='hide'}
-#Plot the 15 minute data
-TurnPlot2=plotts.sample.wge(AnonDataTurnstile2_15)
-```
-
-**15 minute data for turnstile three**
-```{r Visualize turn 3 15, echo=T, results='hide'}
-#Plot the 15 minute data
-TurnPlot3=plotts.sample.wge(AnonDataTurnstile3_15)
-```
 
 Start ID'ing the data by using the Box and Jeakins method with first differcing the data
 ```{r Differcing the data, echo=T, results='hide'}
 #Differcing the data to use the Box and Jeakins method
 AnonDataTurnstile_diff=artrans.wge(AnonDataTurnstile,phi.tr=1)
-AnonDataTurnstile_15_diff=artrans.wge(AnonDataTurnstile_15,phi.tr=1)
-Turnstile1_15_diff=artrans.wge(AnonDataTurnstile1_15,phi.tr=1)
-Turnstile2_15_diff=artrans.wge(AnonDataTurnstile2_15,phi.tr=1)
-Turnstile3_15_diff=artrans.wge(AnonDataTurnstile3_15,phi.tr=1)
 ```
 
 ```{r, echo=T, results='hide'}
@@ -234,24 +194,10 @@ Turnstile3_15_diff=artrans.wge(AnonDataTurnstile3_15,phi.tr=1)
 plotts.sample.wge(AnonDataTurnstile_diff)
 ```
 
-
-Get a few more plots of the differenced data
-```{r, echo=T, results='hide'}
-#Plot the 15 minute data - diff
-plotts.sample.wge(AnonDataTurnstile_15_diff)
-```
-
-Use aic5.wge() to identify estimates of p and q on the differanced 15 minute data.
+Use aic5.wge() to identify estimates of p and q on the differanced data.
 ```{r aic5}
 #AIC of the hourly data
 aic5.wge(AnonDataTurnstile_diff)
-#aic5.wge(AnonDataTurnstile_15_diff)
-#aic5.wge(Turnstile1_15_diff)
-#aic5.wge(Turnstile2_15_diff)
-#aic5.wge(Turnstile3_15_diff)
-#Changing some settings
-#aic5.wge(AnonDataTurnstile_15_diff,p=0:11,q=0:5,type="aic")
-#aic5.wge(AnonDataTurnstile_15_diff,p=0:11,q=0:5,type="bic")
 ```
 
 Use the estimate of p and q to get estimates of the phis and thetas.
@@ -270,31 +216,67 @@ wnv=est$avar
 wnv
 ```
 
-#### Final Model
+#### Final ARMA Model
 $$(1-B)(1-0.626B-0.119B^2-0.006B^3+0.195B^4)X_t=(1-0.973B)a_t\  \sigma^2_a=872.23$$
 
 ```{r}
-#forcasting
-fore15_diff=fore.arma.wge(AnonDataTurnstile_15_diff, phi = est$phi, theta = est$theta, lastn = T, n.ahead = 48, limits=F)
 #forcast hour
 foreHour_diff=fore.arma.wge(AnonDataTurnstile_diff, phi = est$phi, theta = est$theta, lastn = T, n.ahead = 48, limits=F)
 ```
 
+####Seasonal Model  
+
 Lets see what a Seasonal Model might look like
-```{r Factor}
-#Factor tables
-fact15_diff=est.ar.wge(AnonDataTurnstile_15,p=8,type='burg')
+
+Look at the data again.
+```{r Seasonal parzen, echo=T, results='hide'}
+plotts.sample.wge(AnonDataTurnstile)
 ```
+There are a few peeks we can look at for a sign of seasonality in the data.  
+This data is from a collage so we might expect to find a nine month pattern accounting for the three months of Summer break.  
+We found the factors at 36 seemed to match up. This would coinside with a 9 month weekly pattern.
+```{r Factor Table}
+#Factor tables
+factAnonData=est.ar.wge(AnonDataTurnstile,p=36,type='burg')
+factor.wge(c(rep(0,35),1)) #(1-B^36)
+#factor.wge(c(0,0,0,0,0,0,0,0,1)) #(1-B^9)
+```
+
+Use artrans.wge() to get y. This is to remove the seasonality in the data.  
+```{r remove the seasonality}
+#Use artrans.wge() to get y. This is to remove the seasonality in the data.
+#In this data we are checking for nine months weekley number (36).
+y = artrans.wge(AnonDataTurnstile,phi.tr=c(c(rep(0,35),1)))
+# y is the transformed data
+#aic5.wge(y,p=0:15,q=0:6,type='bic')
+```
+
+Based on the decision to fit an ARMA(15,5) model, we use the est.ar.wge command to obtain ML estimates.  
+```{r}
+AnonDataTurnstile.est155=est.arma.wge(y,p=15, q=5)
+AnonDataTurnstile.est155$phi
+AnonDataTurnstile.est155$theta
+AnonDataTurnstile.est155$avar
+
+mean(AnonDataTurnstile)
+```
+
+#### Final Seasonal Model
+$$(1-B^{36})(1-1.195B-0.0297B^2-0.0842B^3-0.187B^4+1.169B^5-0.524B^6-0.076B^7-0.217B^8+0.197B^9+0.011B^{10}-0.023B^{11}+0.033B^{12}-0.078B^{13}+0.075B^{14}-0.0318B^{15})(X_t-63.8)=(1-0.614B-0.302B^2-0.305B^3-0.624B^4+0.993B^5)a_t\  \sigma^2_a=1474.46$$
+```{r season fore, echo=T, results='hide'}
+seasonFore=fore.aruma.wge(AnonDataTurnstile,phi=c(factAnonData$phi),s=36,n.ahead=48,limits=F)
+seasonFore$f
+
+fore.aruma.wge(AnonDataTurnstile,phi=c(factAnonData$phi),s=36,n.ahead=48,plot=T,lastn=T,limits=F)
+```
+
 
 Trying the forecasting package on the hourly data
 ```{r forcasting package hourly data}
-#Trying the forcasting package on the 15 minute data
-AnonDataTurnstile.f = auto.arima(AnonDataTurnstile, stepwise=FALSE, approximation=FALSE)
-
-AnonDataTurnstile.f
+#Trying the forcasting package
+AnonDataTurnstile.f = auto.arima(AnonDataTurnstile, stepwise=FALSE, approximation=FALSE, stationary = FALSE, seasonal = TRUE, trace = FALSE,max.p = 13,max.q = 5,max.P = 13,max.Q = 5)
 
 HourForcast=forecast(AnonDataTurnstile.f, h=48, level = 95)
-HourForcast
 # Automatic ARIMA forecasts
 AnonDataTurnstile %>%
   auto.arima() %>%
@@ -302,17 +284,4 @@ AnonDataTurnstile %>%
   autoplot()
 ```
 
-Trying the forecasting package on the 15 minute data
-```{r forcasting package 15 minute data}
-#Trying the forcasting package on the 15 minute data
-AnonDataTurnstile_15.f = auto.arima(AnonDataTurnstile_15, stepwise=FALSE, approximation=FALSE)
-
-forecast(AnonDataTurnstile_15)
-
-# Automatic ARIMA forecasts
-AnonDataTurnstile_15 %>%
-  auto.arima() %>%
-  forecast(h=600) %>%
-  autoplot()
-```
 
