@@ -1,0 +1,5 @@
+library(tvReg)
+data(usmacro, package = "bvarsv")
+VAR.fit <- vars::VAR(usmacro, p = 6, type = "const")
+tvVAR.fit <- tvVAR(usmacro, p = 6, type = "const", bw = c(1.8, 20, 20))
+plot(tvVAR.fit)

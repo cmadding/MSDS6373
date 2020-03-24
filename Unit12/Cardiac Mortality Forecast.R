@@ -7,7 +7,8 @@ library(tidyverse)
 library(GGally)
 library(astsa)
 library(tswge)
-CM = read.csv(file.choose(),header = TRUE)
+
+CM = read.csv("la_cmort_study.csv", header = TRUE)
 
 head(CM)
 ggpairs(CM[2:4]) #matrix of scatter plots
@@ -38,7 +39,7 @@ acf(CM_52,lag.max = 48) # acf looks consistent with white noise
 predsTemp = fore.aruma.wge(CM$temp,s = 52, n.ahead = 20)
 
 
-# Model cmort based on predicted part and temp using MLR with Cor Erros
+# Model cmort based on predicted part and temp using multiple linear regression (MLR) with corralation Errors
 #assuming data is loaded in dataframe CM
 ksfit = lm(cmort~temp+part+Week, data = CM)
 phi = aic.wge(ksfit$residuals)
@@ -55,7 +56,7 @@ next20 = data.frame(temp = predsTemp$f, part = predsPart$f, Week = seq(509,528,1
 #get predictions
 predsCMort = predict(fit,newxreg = next20)
 #plot next 20 cmort wrt time
-plot(seq(1,508,1), cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
+plot(CM$cmort, type = "l",xlim = c(0,508), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
 lines(seq(509,528,1), predsCMort$pred, type = "l", col = "red")
 
 #Find ASE  Need to forecast last 30 of known series.  
@@ -63,7 +64,7 @@ CMsmall = CM[1:478,]
 ksfit = lm(cmort~temp+part+Week, data = CMsmall)
 phi = aic.wge(ksfit$residuals)
 attach(CMsmall)
-fit = arima(cmort,order = c(phi$p,0,0), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(temp, part, Week))
+fit = arima(cmort,order = c(phi$p,0,0), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CMsmall$temp, CMsmall$part, CMsmall$Week))
 
 last30 = data.frame(temp = CM$temp[479:508], part = CM$part[479:508], Week = seq(479,508,1))
 #get predictions
@@ -73,7 +74,7 @@ predsCMort = predict(fit,newxreg = last30)
 ASE = mean((CM$cmort[479:508] - predsCMort$pred)^2)
 ASE
 
-#Find ASE  Need to forecast last 30 of known series.  
+#Find ASE  Need to forecast last 30 of known series using dplyr lag.  
 CMsmall = CM[1:478,]
 CMsmall$temp_1 = dplyr::lag(CMsmall$temp,1)
 CM$temp_1 = dplyr::lag(CM$temp,1)
@@ -92,10 +93,6 @@ lines(seq(479,508,1), predsCMort$pred, type = "l", col = "red")
 
 ASE = mean((CM$cmort[479:508] - predsCMort$pred)^2)
 ASE
-
-
-
-
 
 
 
@@ -133,7 +130,7 @@ predsTemp = fore.aruma.wge(CM$temp,s = 52, n.ahead = 20)
 CM$FWeek = as.factor(CM$Week%%52)
 ksfit = lm(cmort~temp+part+Week+FWeek, data = CM)
 phi = aic.wge(ksfit$residuals)
-fit = arima(cmort,order = c(phi$p,0,0), xreg = cbind(CM$temp, CM$part, CM$Week, CM$FWeek))
+fit = arima(CM$cmort,order = c(phi$p,0,0), xreg = cbind(CM$temp, CM$part, CM$Week, CM$FWeek))
 
 # Check for whiteness of residuals
 acf(fit$residuals)
@@ -155,7 +152,7 @@ preds = predict(ksfit, newdata = next20)
 predsFinal = preds + resids$f
 
 #plot next 20 cmort wrt time
-plot(seq(1,508,1), cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
+plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
 lines(seq(509,528,1), predsFinal, type = "l", col = "red")
 
 
@@ -257,7 +254,7 @@ preds = predict(ksfit, newdata = next20)
 predsFinal = preds + resids$f
 
 #plot next 20 cmort wrt time
-plot(seq(1,508,1), cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
+plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
 lines(seq(509,528,1), predsFinal, type = "l", col = "red")
 
 
@@ -302,7 +299,7 @@ ASE
 # Doesn't have to be white... just stationary
 library(vars)
 
-CM = read.csv(file.choose(),header = TRUE)
+CM = read.csv("la_cmort_study.csv", header = TRUE)
 
 CM_52 = artrans.wge(CM$cmort,c(rep(0,51),1))
 Part_52 = artrans.wge(CM$part,c(rep(0,51),1))

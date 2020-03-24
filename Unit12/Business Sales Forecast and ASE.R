@@ -1,12 +1,21 @@
-# UNIT 12 R Code
+
+library(tidyverse)
+library(GGally)
+library(astsa)
+library(tswge)
+library(vars)
+
+#Read in the sales data
+BSales = read.csv("businesssales.csv", header = TRUE)
+
+## Visualaze The Data
+head(BSales)
+#Make a matrix of plots with the BSales data set.
+ggpairs(BSales[2:4]) #matrix of scatter plots
 
 ### MLR Modeling
 
-
 # Model 1
-
-#Assuming a data.frame exists with corresponding names below.
-BSales = read.csv(file.choose(), header = TRUE)
 
 # All data with no lag and no trend
 ksfit=lm(sales~ad_tv+ad_online+discount, data = BSales)
@@ -29,12 +38,10 @@ preds = predict(fit, newxreg = cbind(BSales$ad_tv[96:100],BSales$ad_online[96:10
 ASE1 = mean((BSales$sales[96:100] - preds$pred)^2)
 ASE1
 
-dev.off()
+while (!is.null(dev.list()))  dev.off()
+
 plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
 lines(seq(96,100,1), preds$pred, type = "l", col = "red")
-
-
-
 
 
 # Model 2
@@ -54,7 +61,7 @@ preds = predict(fit, newxreg = cbind(BSales$ad_tv[96:100],BSales$ad_online[96:10
 ASE2 = mean((BSales$sales[96:100] - preds$pred)^2)
 ASE2
 
-dev.off()
+while (!is.null(dev.list()))  dev.off()
 plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
 lines(seq(96,100,1), preds$pred, type = "l", col = "red")
 
@@ -100,7 +107,7 @@ ASE3 = mean((BSales$sales[96:100] - preds$pred)^2)
 ASE3
 
 
-dev.off()
+while (!is.null(dev.list()))  dev.off()
 plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
 lines(seq(96,100,1), preds$pred, type = "l", col = "red")
 
@@ -118,7 +125,7 @@ ad_tvFORECAST = fore.arma.wge(BSales$ad_tv,phi = est_ad_tv$phi, theta = est_ad_t
 plotts.sample.wge(BSales$ad_online)
 aic5.wge(BSales$ad_online, p = 0:10)
 est_online = est.arma.wge(BSales$ad_online,p = 6)
-dev.off()
+while (!is.null(dev.list()))  dev.off()
 plot.ts(BSales$ad_online[1:100])
 ad_onlineFORECAST = fore.arma.wge(BSales$ad_online,phi = est_online$phi, n.ahead = 6)
 
@@ -167,7 +174,7 @@ ASE4 = mean((BSales$sales[96:100] - preds$fcst$y1[,1])^2)
 ASE4
 
 
-dev.off()
+while (!is.null(dev.list()))  dev.off()
 plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
 lines(seq(96,100,1), preds$fcst$y1[,1], type = "l", col = "red")
 
@@ -180,6 +187,6 @@ preds = predict(BSVar,n.ahead = 5)
 ASE5 = mean((BSales$sales[96:100] - preds$fcst$y1[,1])^2)
 ASE5
 
-dev.off()
+while (!is.null(dev.list()))  dev.off()
 plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
 lines(seq(96,100,1), preds$fcst$y1[,1], type = "l", col = "red")

@@ -36,7 +36,7 @@ In the following R code, y denotes the realization Y_t, z denotes Z_t, and x1,..
 The command
 
 **fit**
-produces the following example “dummy” output (assuming phi$p=2)  
+produces the following example dummy output (assuming phi$p=2)  
 
     Coefficients:  
           ar1      ar2   intercept    x1     x2     x3  
@@ -44,8 +44,8 @@ produces the following example “dummy” output (assuming phi$p=2)
     s.e.  0.6      0.3     2.2       0.9    1.2    0.2  
     sigma2 estimated as 1.4: log likelihood=-16,aic=20.1  
 
-  * Recall that we don’t usually look at the SE’s for AR and MA coefficients (the factor table gives more information).   
-  * Function arima doesn’t give p-values, but in general if the absolute value of the coefficient is over two times the SE, this is evidence at the .05 level that the variable is useful.  
+  * Recall that we don't usually look at the SE's for AR and MA coefficients (the factor table gives more information).   
+  * Function arima doesn't give p-values, but in general if the absolute value of the coefficient is over two times the SE, this is evidence at the .05 level that the variable is useful.  
   * The final model residuals are given in **fit$resid**, and they should be white  
     + Check with residual plots and/or **Ljung-Box Test**.  
   * Compare competing models with **AIC/AIC/BIC** etc.  
@@ -56,9 +56,9 @@ produces the following example “dummy” output (assuming phi$p=2)
 
 We are interested identifying variables that impact sales (Y).  
 Variables we consider are (data in file BusinessSales.csv)  
-    *TV advertising expenditures (𝑋_1) (variable ad_tv)
-    *Online advertising expenditures (𝑋_2) (ad_online)
-    *Discount on product (𝑋_3) (variable discount)
+    *TV advertising expenditures (_1) (variable ad_tv)
+    *Online advertising expenditures (_2) (ad_online)
+    *Discount on product (_3) (variable discount)
     
 We have data for the past 100 weeks. That is, for each variable, we have a time series realization of length n =100 (weeks):  
 
@@ -123,7 +123,7 @@ lines(seq(96,100,1), preds$pred, type = "l", col = "red")
 
 These results are not very enlightening (or encouraging)
 
-Let’s try adding a trend term to the model
+Let's try adding a trend term to the model
 
 ##Add a trend term (t=week) to the model
 ```{r trend term}
@@ -148,17 +148,17 @@ There is strong evidence that the residuals are serially correlated.
 
  **Summary:**  
 
-Let’s keep working on this!
+Let's keep working on this!
 
 #### How About Using Lagged Variables?  
 
-Advertising for the week didn’t seem to predict sales for that week  
+Advertising for the week didn't seem to predict sales for that week  
 
-  * It could be that advertising has a “lag” effect  
+  * It could be that advertising has a lag effect  
 
   * That is, advertising for the current week may have more effect on sales next week than this week  
 
-We next considered a multiple regression in which the “advertising variables at time t” are actually costs for the previous week  
+We next considered a multiple regression in which the advertising variables at time t are actually costs for the previous week  
 
   * These will be denoted **ad_tv1** and **ad_online1**  
   
@@ -212,6 +212,7 @@ BSales$ad_tv1= ad_tv1
 BSales$ad_online1 = ad_online1
 head(BSales)
 ```
+
 Fit the lagged variables with a Multivariate regression.  
 ```{r}
 ksfit=lm(sales~ad_tv1+ad_online1+discount, data = BSales)
@@ -221,7 +222,7 @@ fit=arima(BSales$sales,order=c(7,0,0),xreg=cbind(ad_tv1, ad_online1, discount))
 fit
 ```
 
-both “ad” variables are highly significant.  
+both ad variables are highly significant.  
 3.43/.6 and 8.1/1.24. Far away from zero and larger standard error.  
 
 Now let look at adding a time trend.
@@ -244,7 +245,6 @@ The AIC is lower in the model with the Time trend so the AIC favors the one with
 **Lagged "ad" variables and trend:**  
 
 $$Sales=\beta_0+\beta_{1t}+\beta_2ad_tv_{t-1}+\beta_3ad_online{t_1}+\beta_4discount_t+Z_t\ Z_t\ is\ AR(7)$$
-
 
 Time is somewhat significant, around 2 if we divide (.0065/.0038=1.71). The two ad's are still very significant, and the discount is not significant.  
   
@@ -271,12 +271,12 @@ $$Y_t=\beta_1X_{t1}+\beta_2X_{t2}+...+\beta_mX_{tm}+Z_t$$
 
 **Note from the model:**  
   * All independent variables and the dependent variable are evaluated at the same time$t$.  
-    + This “restriction” seems to eliminate the use of lagged relationships in the multiple regression model.  
+    + This restriction seems to eliminate the use of lagged relationships in the multiple regression model.  
   * However, using the technique employed in the sales example, you can let, for example,$X_{t1}$, actually denote the TV-ad expenditures at time $t-1$.  
-  * This technique allows for identifying “lagged” relationships although the model itself seems to not allow them.  
+  * This technique allows for identifying lagged relationships although the model itself seems to not allow them.  
 
 **Point to remember:**  
-Don’t forget to consider lagged information.  
+Don't forget to consider lagged information.  
 
 **Concept Check 12.3.2** 
 
@@ -286,9 +286,9 @@ We fit a multiple regression model to the data as we usually would, assuming the
 
 **Cross-Correlation between 2 Time Series**  
 
-A useful tool for detecting the existence of “lagged relationships” in multivariate time series analysis is the *cross-correlation function*.  
+A useful tool for detecting the existence of lagged relationships in multivariate time series analysis is the *cross-correlation function*.  
 
-The “cross-correlation” between variables $X_{t1}$ and $X_{t2}$ at lag $k$ is the *correlation between* $X_{t,1}$ and $X_{t+k,2}$.  
+The cross-correlation between variables $X_{t1}$ and $X_{t2}$ at lag $k$ is the *correlation between* $X_{t,1}$ and $X_{t+k,2}$.  
 
 We find the cross-correlation at lag k using the ordered pairs.
 
@@ -397,8 +397,8 @@ preds$fcst$x1[1:5,1]
 
 Using the code above from the VAR example: 
 
-Note that the VAR model results were stored in a variable named “lsfit.”
-Find the details of the model by entering “summary(lsfit).” 
+Note that the VAR model results were stored in a variable named lsfit.  
+Find the details of the model by entering summary(lsfit).  
 There is strong evidence that the X1 variable is related to X2 variable but not at the current time period.
 
 ```{r summary(lsfit)}
@@ -419,7 +419,7 @@ What is the p-value that is reflecting the strength of that association? (Expres
 What Happened?  
 
 Why are the forecasts for x1 so good?  
-Let’s look at the data again.  
+Let's look at the data again.  
 
 x1(t) is essentially a scaled version of 2*x2(t-5)  
 ```{r}
@@ -455,7 +455,7 @@ Because variable $X_{t1}=2X_{t-5,2}$, we would expect the VAR forecasts to someh
   * AIC applied to each series separately picked an AR(2).  
   * Function **VARselect** identified the VAR model as a VAR(5).  
     + It was necessary that **p** was at least **5** so that lag 5 would be in the fitted model  
-    + AIC detected this “by itself”  
+    + AIC detected this by itself  
     + The fitted **VAR(5)** model gave essentially perfect forecasts for $X_{t1}$ for steps ahead to 5  
     + The forcast for $X_{t2}$ showed no detectable improvement over the univariate forecasts.  
 
@@ -464,8 +464,8 @@ Melanoma Sunspot Example Annual Data: 1936-1972
 
 This data set has caused interest because of the fact that there is some evidence that the melanoma incidence at year $t$ is related to the sunspot number at year $t-2$.  
 
-The “peak” at -2 suggests that sunspot number at time t-2 is related to melanoma at time t  
-But, note that the “peak” is within the error bars for zero cross-correlations  
+The peak at -2 suggests that sunspot number at time t-2 is related to melanoma at time t  
+But, note that the peak is within the error bars for zero cross-correlations  
 
   * Relationship may not be strong
 
@@ -517,13 +517,182 @@ points(seq(33,37,1),preds$fcst$mel.67[1:5,1],type = "b", pch = 15)
 fanchart(preds)
 ```
 
+####Melanoma incidence and sunspot numbers 1936-1972
+```{r}
+# Enter the data
+melanoma=c(1.0, 0.9, 0.8, 1.4, 1.2, 1.0, 1.5, 1.9, 1.5, 1.5, 1.5, 1.6, 1.8, 2.8, 2.5, 2.5, 2.4, 2.1, 1.9, 2.4, 2.4, 2.6, 2.6, 4.4, 4.2, 3.8, 3.4, 3.6, 4.1, 3.7, 4.2, 4.1, 4.1, 4.0, 5.2, 5.3, 5.3)
+sunspot=c(40, 115, 100,  80,  60,  40,  23,  10,  10,  25,  75, 145, 130, 130,  80,  65,  20,  10,   5,  10, 60, 190, 180, 175, 120,  50,  35,  20,  10,  15,  30,  60, 105, 105, 105,  80,  65)
+```
+
+Use the Cross Corralation Function to see a weak corralation (spike) at -2 and -12.
+```{r}
+#use the Cross Corralation Function
+ccf(sunspot,melanoma, ylim=c(-1,1))
+```
+
+####Univariate Regression
+
+save some of the last data for testing the forcast
+```{r}
+#save some of the last data for testing the forcast
+mel.67=melanoma[1:32]
+sun.67=sunspot[1:32]
+```
+
+Diganose the AR side of the melanoma data model with AIC.
+```{r}
+p.mel=aic.wge(mel.67,p=0:8,q=0:0)
+p.mel$p
+```
+
+Estimate the coefficient and make an AR(1) forecast for the melanoma data.
+This will slowly dampen to the sample mean.
+```{r}
+mel.est=est.ar.wge(mel.67,p=p.mel$p)
+fore.arma.wge(mel.67,phi=mel.est$phi,n.ahead=5,lastn=FALSE,limits=FALSE)
+```
+
+Diganose the AR side of the sun data model with AIC.
+```{r}
+p.sun=aic.wge(sun.67,p=0:8,q=0:0)
+p.sun$p
+```
+
+Estimate the coefficient and make an AR(3) forecast for the sun data.
+This will slowly dampen to the sample mean.
+```{r}
+sun.est=est.ar.wge(sun.67,p=p.sun$p)
+fore.arma.wge(sun.67,phi=sun.est$phi,n.ahead=5,lastn=FALSE,limits=FALSE)
+```
+
+First step is to bind the two together with the **cbind** command.
+```{r}
+X=cbind(mel.67,sun.67)
+```
+
+Second, get a good estimate of k to see what the lag is.  
+Look for the lowest AIC, in this case it is an AIC of 5.04.  
+```{r}
+#VAR and VARselect are from CRAN package vars
+VARselect(X, lag.max = 6, type = "const",season = NULL, exogen = NULL) #AIC = 5.04
+```
+
+VARselect picks p=4 (using AIC) so use that in VAR.
+```{r}
+lsfit=VAR(X,p=4,type='const')
+```
+
+Now look at the predictions by feeding the lsfit into the predict function.
+```{r}
+preds=predict(lsfit,n.ahead=5)
+preds
+```
+
+To get the melanoma forcast we will need to dig into the preds variable a bit.
+Rows 1 through 5 coloum 1 are the VAR forecasts for menlanoma. Similar for sunspot.
+```{r}
+preds$fcst$mel.67[1:5,1]
+#plot the original data from 1 to 37 with dot and lines "b"
+plot(seq(1,37,1),melanoma, type = "b", ylim = c(0,6))
+#Overlay the forcast with squares (pch = 15)
+points(seq(33,37,1),preds$fcst$mel.67[1:5,1],type = "b", pch = 15)
+fanchart(preds)
+```
+Again, judging by the wider confidence intervals, we can see that sunspots provide more information in predicting melanoma than the other way around.
 
 
+Before leaving this example, we examine the melanoma-sunspot data using a multiple regression with correlated errors.  
 
+Since melanoma tends to trend upward we include t (time) and sunspot as independent variables for predicting melanoma.  
+```{r}
+t=1:37 #the size of the dataset
+#Fitting Linear Model using t (time) and sunspot as independent variables
+ksfit=lm(melanoma~sunspot+t)
+#Diganose with AIC using the residuals
+phi=aic.wge(ksfit$residuals,p=0:8,q=0:0)
+# AIC picks p=2
+fit=arima(melanoma,order=c(phi$p,0,0),xreg=cbind(t,sunspot))
+fit
+```
+Devide by the **Standard Errors** to see if there is any significants
 
+**There is a significant trend (0.1157/0.0077=15.02597) but sunspot is not a significant predictor (0.0021/0.0017=1.235294).**
 
+Visualize the non lagged data from above. The aic is 45.17.
+```{r}
+preds = predict(fit,newxreg = data.frame(t = c(33,34,35,36,37), sunspot = sunspot[33:37]))
+plot(seq(1,37,1),melanoma, type = "b")
+points(seq(33,37,1),preds$pred,type = "b", pch = 15)
+```
 
+Remembering that melanoma incidence seemed to be related to sunspot activity two years earlier, we examine a lagged effect (along with time).
+We compute variables sun2 and mel2 below.
+```{r}
+t=1:35
+sun2=sunspot[1:35]
+mel2=melanoma[1:35]
+for(i in 1:35){mel2[i]=melanoma[i+2]}
+ksfit=lm(mel2~t+sun2)
+phi=aic.wge(ksfit$residuals,p=0:8,q=0:0)  # AIC picks p=1
+fit=arima(mel2,order=c(phi$p,0,0),xreg=cbind(t,sun2))
+fit
+```
+AIC picked an AR(1) for the residuals.
+The coefficients for **trend and sunspots** are significant in the lagged data.
 
+The aic is 22.94 beating the 45.17 in the above non lagged model.
 
+Visualize the lagged data.
+```{r}
+preds = predict(fit,newxreg = data.frame(t = c(33,34,35,36,37), sunspot = sunspot[33:37]))
+plot(seq(1,37,1),melanoma, type = "b")
+points(seq(33,37,1),preds$pred,type = "b", pch = 15)
+```
 
+####12.5.2 Concept Check
+
+Recall the sales example we worked with earlier from the attached sales data set (BusinessSales.csv). There we fit a multiple regression with serially correlated errors.  
+
+**You will use this data to complete this and the next three Concept Check questions.**
+
+If you recall, the model with the time trend and the TV and online advertising variables at lag 1 had an AIC of 352. We would like to compare a VAR model to the previous model based on the AIC.
+
+Step 1: Reload the data in BusinessSales.csv.  
+*(Start with a fresh data set. You don't need to have the lagged variables in the data set when doing VAR. It will search for those automatically.)*
+Drop the first coloum, removing what is essentially the 't'.
+```{r}
+#Drop the first coloum
+BSales <- read.csv("businesssales.csv", header = TRUE)[2:5]
+```
+
+Step 2: Use VARselect() to estimate the order of the VAR model. Use the BIC, which is noted as "SC(n)."
+```{r}
+VARselect(BSales, lag.max = 6, type = "const",season = NULL, exogen = NULL)
+```
+
+What is the order estimated by VARSelect? (Express your response as a whole number.)  
+**SC(n) = 2**
+
+####12.5.3 Concept Check
+Step 3: Use VAR() and the order estimated in the last step to fit the VAR model. Fit it with a trend and without a trend.
+```{r}
+#Fit it with a trend
+Trend=VAR(BSales, p = 2, type = 'trend')
+summary(Trend)
+```
+
+```{r}
+#Fit it without a trend
+NoTrend =VAR(BSales,p=2,type='const')
+summary(NoTrend)
+```
+Is there enough evidence to suggest the trend term is appropriate?
+
+**No**
+
+What is the AIC of the VAR model with no trend and the estimated order? (Express your answer rounded to two decimal places.)
+
+```{r}
+AIC(NoTrend)
+```
 

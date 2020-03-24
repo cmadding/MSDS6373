@@ -1,0 +1,346 @@
+---
+title: "Using Turnstile Data To Forcast Student Worker Staffing"
+author: "Chad Madding, Shane Weinstock"
+date: "March 12, 2020"
+output: html_document
+---
+
+**Deliverables:**  
+
+**EDA:**  
+
+Saturday March 21 at 11:59pm  
+
+**Deliverable:**  
+
+1.	3-minute YouTube video: (You can use the same slides but each team member must make the full presentation with all the slides.)  
+
+    a.	Identify yourself and your team (if applicable).  
+    b.	Describe Data Set / Time Series (Who, What, When, Where, Why and How)  
+    c.	Stationary / Non-Stationary  
+    d.	ACFs and Spectral Densities just to explore  
+    e.	At least 2 candidate ARMA / ARIMA models  
+    
+        a.	The models in factored form or at least separate the stationary and non-stationary factors with standard deviation or variance of the white noise.  
+        b.	AIC  
+        c.	ASE  
+        d.	Visualization of Forecasts with a Practical Horizon.  
+        j.	Strategy / Plans for the rest of the analysis.  
+    
+2.	Submit your slides to 2DS and make sure your video URL is on the Google Doc. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(readxl)
+library(tswge)
+library(plyr)
+library(dplyr)
+library(forecast)
+library(ggplot2)
+library(ggthemes)
+```
+
+### Describe Data Set  
+####Time Series (Who, What, When, Where, Why and How)
+
+This is a time series data set collected from three turnstiles at the Dedman Center for Lifetime Sports on the Southern Methodist University campus. The data set is a record of the time of swipe, the turnstile used and an anonymized student ID number. This was collected from January 2nd, 2019 through March 11th, 2020 and consists of 414156 entries. Entry and error swipes are included in the data. It should be noted that the turnstiles are only used to enter the facility and ID swipe is not required to exit the building.  
+
+**Read in the data**  
+```{r Read in, echo=FALSE}
+#Read in the data
+SMUSwipe <- read_excel("AnonDataTurnstile.xlsx")
+str(SMUSwipe)
+weather <- read_csv("2085029.csv")
+#pull out just the hourly weather data
+HourlyWeather = weather[ , c(2, 42:57)]
+str(HourlyWeather)
+```
+
+**Data Cleaning**  
+
+Compactly Display the Structure of the data.
+```{r Cleaning, echo=FALSE}
+#Data Cleaning
+#remove NA's from Temperature data
+HourlyWeather = HourlyWeather[which(!is.na(HourlyWeather$`HourlyDryBulbTemperature`)),]
+#Remove any rejected \ change state rows
+SMUSwipe = SMUSwipe[SMUSwipe[,2]=="CardAdmitted",]
+#Remove duplicate time ID swipes
+SMUSwipe = distinct(SMUSwipe, LDT, .keep_all = TRUE)
+#Create a Time column
+SMUSwipe$Time <- format(SMUSwipe$LDT,"%H:%M:%S")
+#Create a Day column
+SMUSwipe$Day <- format(SMUSwipe$LDT,"%d")
+#Create a Date column
+SMUSwipe$Date <- as.Date(SMUSwipe$LDT)
+#Create an Hour column
+SMUSwipe$Hour <- format(SMUSwipe$LDT,"%H")
+#Create a Day coloum
+SMUSwipe$Day <- weekdays(as.Date(SMUSwipe$LDT))
+#Create an Hours coloum for count
+SMUSwipe$Hours <- format(SMUSwipe$LDT,"%Y-%m-%d-%H")
+#Create a TempTime in SMUSwipe to merge Temperature data
+SMUSwipe$TempTime <- format(SMUSwipe$LDT,"%Y-%m-%d %H")
+#Create a TempTime in HourlyWeather to merge Temperature data
+HourlyWeather$TempTime <- format(HourlyWeather$DATE,"%Y-%m-%d %H")
+#Left join on TempTime to pull in hourly weather data
+SMUSwipe=left_join(SMUSwipe, HourlyWeather, 'TempTime')
+#Remove dup after the left join
+SMUSwipe = distinct(SMUSwipe, LDT, .keep_all = TRUE)
+```
+
+We now have a dataset with weather data along with card swipes.
+```{r}
+head(SMUSwipe)
+```
+
+Hourly ID Swipes for all Turnstiles?
+```{r Hour Group}
+#Group all badge swipes by the hour
+df = count(SMUSwipe, Hours)
+hourplot = count(SMUSwipe,Hour)
+
+hourplot %>%
+  ggplot(aes(x=Hour,y=n, group=1))+
+  geom_line()+
+  geom_point()+
+  theme_economist()+
+  scale_colour_economist()+
+  ggtitle('Hourly ID Swipes for all Turnstiles')
+```
+
+What are the Daily ID Swipes for all Turnstiles?  
+```{r}
+dayCount=count(SMUSwipe, Day)
+dayCount$Day <- factor(dayCount$Day, levels= c("Sunday", "Monday", 
+    "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+
+dayCount=dayCount[order(dayCount$Day), ]
+  
+dayCount %>%
+  ggplot(aes(x=Day,y=n, group=1))+
+  geom_line()+
+  geom_point()+
+  theme_economist()+
+  scale_colour_economist()+
+  theme_economist()+
+  ggtitle('Daily ID Swipes for all Turnstiles')+
+  ylab('ID Swipes')
+```
+
+We want to group all ID swipes by 15 minutes (quarter hour).
+```{r 15 Minute Group}
+#Group all ID swipes by 15 minutes (quarter hour)
+SMUSwipe$Minutes <- format(SMUSwipe$LDT,"%M")
+SMUSwipe$interval_15 <-ifelse(SMUSwipe$Minutes <= 15, 1, ifelse(SMUSwipe$Minutes <= 30, 2, ifelse(SMUSwipe$Minutes <= 45, 3, ifelse(SMUSwipe$Minutes <= 60, 4))))
+SMUSwipe$Minutes_15<-paste(SMUSwipe$Hours, SMUSwipe$interval_15, sep=" ")
+```
+
+Create a data set for each turnstile.  
+```{r}
+#Create a dataset for each turnstyle
+SMUSwipeTurn1 = SMUSwipe[SMUSwipe[,4]=="DEDM (101.1LB)",]
+SMUSwipeTurn2 = SMUSwipe[SMUSwipe[,4]=="DEDM (101.2LB)",]
+SMUSwipeTurn3 = SMUSwipe[SMUSwipe[,4]=="DEDM (101.3LB)",]
+
+HTurn1 = count(SMUSwipeTurn1, Hour)
+HTurn1 %>%
+  ggplot(aes(x=Hour,y=n, group=1))+
+  geom_line()+
+  geom_point()+
+  theme_economist()+
+  scale_colour_economist()+
+  ggtitle('Hourly Card Swipes for Turnstile 1')
+
+HTurn2 = count(SMUSwipeTurn2, Hour)
+HTurn2 %>%
+  ggplot(aes(x=Hour,y=n, group=1))+
+  geom_line()+
+  geom_point()+
+  theme_economist()+
+  scale_colour_economist()+
+  ggtitle('Hourly Card Swipes for Turnstile 2')
+
+HTurn3 = count(SMUSwipeTurn3, Hour)
+HTurn3 %>%
+  ggplot(aes(x=Hour,y=n, group=1))+
+  geom_line()+
+  geom_point()+
+  theme_economist()+
+  scale_colour_economist()+
+  ggtitle('Hourly Card Swipes for Turnstile 3')
+```
+
+Looks like turnstile 3 gets used more than the others but the pattern of usage looks the same accross each.  
+
+This data is anamonized but we can still see who are some of the top users.
+```{r ID Count}
+#This will count up the times users swiped in. 
+IDCount = count(SMUSwipe, `ID#`)
+#Print off the top 10 users ordering nuency in decending order
+head(IDCount[order(IDCount$n, decreasing = TRUE),],10)
+```
+Look at some user data.
+```{r}
+#Breakdown user numbers
+summary(IDCount$n)
+#how many uses
+count(IDCount)
+```
+
+Convert the hourly data to time series.
+```{r}
+#Hourley data
+AnonDataTurnstile = ts(df$n)
+```
+
+####Visualize what we have so far.
+
+**Plot the hourly data for all three turnstyles**
+```{r Visualize turn hour, echo=T, results='hide'}
+#Plot the hourly data
+TurnPlotHour=plotts.sample.wge(AnonDataTurnstile)
+
+# Test for Conditions
+x = AnonDataTurnstile
+tswge::plotts.wge(x)
+plotts.sample.wge(x)
+plotts.sample.wge(head(x,length(x)/2))
+plotts.sample.wge(tail(x,length(x)/2))
+
+pacf(x)
+
+```
+
+
+Start ID'ing the data by using the Box and Jeakins method with first differcing the data
+```{r Differcing the data, echo=T, results='hide'}
+#Differcing the data to use the Box and Jeakins method
+AnonDataTurnstile_diff=artrans.wge(AnonDataTurnstile,phi.tr=1)
+```
+
+```{r ASE}
+p=4;q=4;s=0
+es=tswge::est.arma.wge(x,p=p,q=q)
+
+ase = function(f,x){mean((f - tail(x,length(f)))^2)}
+m = tswge::fore.aruma.wge(x,phi = es$phi,theta = es$theta,s=s,n.ahead = 48,lastn = T)
+ase = ase(m$f,x)
+message("ASE is: ",ase)
+ase1=ase
+```
+
+```{r, echo=T, results='hide'}
+#Plot the differeaced hourly data - diff
+plotts.sample.wge(AnonDataTurnstile_diff)
+```
+
+Use aic5.wge() to identify estimates of p and q on the differanced data.
+```{r aic5}
+#AIC of the hourly data
+aic5.wge(AnonDataTurnstile_diff)
+aic5.wge(AnonDataTurnstile_diff, type = "bic")
+x = AnonDataTurnstile_diff
+pacf(x)
+```
+
+Use the estimate of p and q to get estimates of the phis and thetas.
+```{r estimate}
+#Use the estimate of p and q to get estimates of the phis and thetas.
+est = est.arma.wge(AnonDataTurnstile_diff, p = 4, q = 1)
+```
+
+```{r}
+#Use the estimated model to forecast and so on. 
+phi=est$phi
+phi
+theta=est$theta
+theta
+wnv=est$avar
+wnv
+```
+
+#### Final ARMA Model
+$$(1-B)(1-0.626B-0.119B^2-0.006B^3+0.195B^4)X_t=(1-0.973B)a_t\  \sigma^2_a=872.23$$
+
+```{r}
+#forcast hour
+foreHour_diff=fore.arma.wge((tail(x,length(x)/72)), phi = est$phi, theta = est$theta, lastn = F, n.ahead = 48, limits=F)
+```
+
+####Seasonal Model  
+
+Lets see what a Seasonal Model might look like
+
+Look at the data again.
+```{r Seasonal parzen, echo=T, results='hide'}
+plotts.sample.wge(AnonDataTurnstile)
+```
+
+There are a few peeks we can look at for a sign of seasonality in the data.  
+This data is from a collage so we might expect to find a nine month pattern accounting for the three months of Summer break.  
+We found the factors at 36 seemed to match up. This would coinside with a 9 month weekly pattern.
+
+```{r Factor Table}
+#Factor tables
+factAnonData=est.ar.wge(AnonDataTurnstile,p=36,type='burg')
+factor.wge(c(rep(0,35),1)) #(1-B^36)
+#factor.wge(c(0,0,0,0,0,0,0,0,1)) #(1-B^9)
+```
+
+Use artrans.wge() to get y. This is to remove the seasonality in the data.  
+```{r remove the seasonality}
+#Use artrans.wge() to get y. This is to remove the seasonality in the data.
+#In this data we are checking for nine months weekley number (36).
+y = artrans.wge(AnonDataTurnstile,phi.tr=c(c(rep(0,35),1)))
+# y is the transformed data
+#aic5.wge(y,p=0:15,q=0:6,type='bic')
+```
+
+Based on the decision to fit an ARMA(15,5) model, we use the est.ar.wge command to obtain ML estimates.  
+```{r}
+AnonDataTurnstile.est155=est.arma.wge(y,p=15, q=5)
+AnonDataTurnstile.est155$phi
+AnonDataTurnstile.est155$theta
+AnonDataTurnstile.est155$avar
+
+mean(AnonDataTurnstile)
+```
+
+#### Final Seasonal Model
+$$(1-B^{36})(1-1.195B-0.0297B^2-0.0842B^3-0.187B^4+1.169B^5-0.524B^6-0.076B^7-0.217B^8+0.197B^9+0.011B^{10}-0.023B^{11}+0.033B^{12}-0.078B^{13}+0.075B^{14}-0.0318B^{15})(X_t-63.8)=(1-0.614B-0.302B^2-0.305B^3-0.624B^4+0.993B^5)a_t\  \sigma^2_a=1474.46$$
+```{r season fore, echo=T, results='hide'}
+seasonFore=fore.aruma.wge(AnonDataTurnstile,phi=c(factAnonData$phi),s=36,n.ahead=48,limits=F)
+seasonFore$f
+
+fore.aruma.wge(AnonDataTurnstile,phi=c(factAnonData$phi),s=36,n.ahead=48,plot=T,lastn=T,limits=F)
+```
+
+```{r ASE2}
+p=15;q=5;s=3
+es=tswge::est.arma.wge(x,p=p,q=q)
+
+ase = function(f,x){mean((f - tail(x,length(f)))^2)}
+m = tswge::fore.aruma.wge(x,phi = es$phi,theta = es$theta,s=s,n.ahead = 48,lastn = T, limits = F)
+ase = ase(m$f,x)
+message("ASE is: ",ase)
+ase2=ase
+```
+
+Trying the forecasting package on the hourly data
+```{r forcasting package hourly data}
+#Trying the forcasting package
+AnonDataTurnstile.f = auto.arima(AnonDataTurnstile, stepwise=FALSE, approximation=FALSE, stationary = FALSE, seasonal = TRUE, trace = FALSE,max.p = 13,max.q = 5,max.P = 13,max.Q = 5)
+
+f=fore.aruma.wge(x, phi = c(1.195, 0.0297, 0.0842, 0.187, -1.169, .524, .076, .217, -.197, -.011,.023,-.033,.078,-.075,.0318), theta = c(.614, .302, .305, .624, -.993), s = 36, n.ahead = 48, plot = TRUE)
+
+HourForcast=forecast(AnonDataTurnstile.f, h=48, level = 95)
+# Automatic ARIMA forecasts
+AnonDataTurnstile %>%
+  auto.arima() %>%
+  forecast(h=48) %>%
+  autoplot()
+```
+
+

@@ -1,0 +1,499 @@
+---
+title: "Unit 12 For Live Session"
+author: "Chad Madding"
+date: "March 22, 2020"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(GGally)
+library(astsa)
+library(tswge)
+library(vars)
+```
+
+## Question Of Interest
+
+The data set (LA_Cmort_Study.csv) is a portion of the data taken from a study (Shumway 1988) on the possible effects of pollution and temperature on weekly cardiac mortality (heart attacks) in Los Angeles County.
+
+**Your goal is to utilize all given information to provide the most useful forecasts for the next 20 weeks of cardiac mortality.** 
+
+You should include plots, tables, and charts to help make your analysis and inferences clear to your peers.
+
+Start by reading in the data and see what it looks like.
+```{r Read In LA Data}
+CM = read.csv("la_cmort_study.csv", header = TRUE)
+#Look at the first few rows
+head(CM)
+```
+
+## Visualaze The Data
+
+Make a matrix of plots with the LA_Cmort data set.
+
+```{r pressure, echo=FALSE}
+ggpairs(CM[2:4]) #matrix of scatter plots
+```
+
+#### ARIMA 1 MLR with Cor Errors (no lag, no seasonl categorical variable)
+First we will forecast the Particles (part).
+The $freq show a peek around 0.0192 showing some sign of a 52 week annual trend.
+```{r forecast Particles, echo=TRUE, results='hide'}
+#plot just the Particles (part)
+plotts.sample.wge(CM$part) #peek in freq near .0192/1=52.08 (annual)
+```
+
+Using multivariate to forecast  
+```{r}
+CMnoX=CM[2:4]
+#install.packages("vars")
+# VAR and VARselect are from CRAN package vars
+VARselect(CMnoX, lag.max = 15, type = "const",season = NULL, exogen = NULL)
+#VARselect picks p=2 (using BIC)
+lsfit=VAR(CMnoX,p=2,type="const")
+preds=predict(lsfit,n.ahead=20)
+# preds$fcst$ are the VAR forecasts for x1.  Similar for x2
+#this will list out just the forcast
+preds$fcst$temp
+```
+
+
+Transform the Particles (part) to remove the seasonality.
+```{r ,echo=TRUE, results='hide'}
+CM_52 = artrans.wge(CM$part, c(rep(0,51),1))
+plotts.sample.wge(CM_52) #looks like some low freq?
+aic5.wge(CM_52) #picks ARMA(2,1) assume stationary
+aic5.wge(CM_52,type = "bic") #picks ARMA(2,1) 
+ljung.wge(CM_52)$pval #FTR Ho
+ljung.wge(CM_52, K = 48)$pval #FTR Ho
+#Going with white noise despite peak at 0 in Spec D. 
+#est = est.arma.wge(CM_52, p = 3, q = 2)
+#CM_52_AR2_MA1 = artrans.wge(CM_52,est$phi)
+predsPart = fore.aruma.wge(CM$part,s = 52, n.ahead = 20, limits = F)
+```
+
+Next we will forecast temperature (Temp).
+```{r ,echo=TRUE, results='hide'}
+#forecast Temp
+plotts.sample.wge(CM$temp) #freq near .0192 (annual)
+CM_52 = artrans.wge(CM$temp, c(rep(0,51),1))
+plotts.sample.wge(CM_52) #looks like some low freq?
+aic5.wge(CM_52) #picks ARMA(0,0)
+aic5.wge(CM_52,type = "bic") #picks ARMA(0,0) 
+ljung.wge(CM_52)$pval
+ljung.wge(CM_52, K = 48)$pval #barely rejects
+acf(CM_52,lag.max = 48) # acf looks consistent with white noise
+predsTemp = fore.aruma.wge(CM$temp,s = 52, n.ahead = 20, limits = F)
+```
+
+Looking at cardiac mortality (heart attacks) in Los Angeles County based on temperature, particles and Week.
+```{r}
+# Model cmort based on predicted part and temp using MLR with Cor Erros
+ksfit = lm(cmort~temp+part+Week, data = CM)
+phi = aic.wge(ksfit$residuals)
+```
+
+Fit an ARIMA with the phi from above (2). Binding the temperature, particle and week data with cbind.
+```{r}
+fit = arima(CM$cmort,order = c(phi$p,0,0), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CM$temp, CM$part, CM$Week))
+```
+
+Visually the acf is showing white noise. Now we need to check for whiteness of residuals with the Ljung-Box Test.
+```{r}
+#First visualize the residuals
+acf(fit$residuals)
+#Run the test with the default 24 and 48 maximum lag for sample autocorrelations to be used.
+ljung.wge(fit$residuals) # pval = .048
+ljung.wge(fit$residuals, K = 48) # pval = .002
+```
+
+Load the forecast Part and Temp data in a data frame. This will extend the week from 509 to 528 with **seq**.
+```{r}
+next20 = data.frame(temp = predsTemp$f, part = predsPart$f, Week = seq(509,528,1))
+```
+
+This will get the predictions
+```{r}
+#get predictions
+predsCMort = predict(fit,newxreg = next20)
+```
+
+plot next 20 cmort wrt time
+```{r}
+plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,508), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
+lines(seq(509,528,1), predsCMort$pred, type = "l", col = "red")
+```
+
+```{r ,echo=TRUE, results='hide'}
+#Find ASE  Need to forecast last 30 of known series using dplyr lag.  
+CMsmall = CM[1:478,]
+CMsmall$temp_1 = dplyr::lag(CMsmall$temp,1)
+CM$temp_1 = dplyr::lag(CM$temp,1)
+ksfit = lm(cmort~temp_1+part+Week, data = CMsmall)
+phi = aic.wge(ksfit$residuals)
+
+fit = arima(CMsmall$cmort,order = c(phi$p,0,0), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CMsmall$temp, CMsmall$part, CMsmall$Week))
+
+last30 = data.frame(temp = CM$temp_1[479:508], part = CM$part[479:508], Week = seq(479,508,1))
+#get predictions
+predsCMort = predict(fit,newxreg = last30)
+
+plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
+lines(seq(479,508,1), predsCMort$pred, type = "l", col = "red")
+
+
+ASE_ARMA1 = mean((CM$cmort[479:508] - predsCMort$pred)^2)
+ASE_ARMA1
+```
+
+
+
+####ARIMA2: attempt at categorical variable for week but arima takes only continuous variables  
+
+forecast Particles
+```{r ,echo=TRUE, results='hide'}
+CM = read.csv("la_cmort_study.csv", header = TRUE)
+plotts.sample.wge(CM$part) #freq near .0192 (annual)
+CM_52 = artrans.wge(CM$part, c(rep(0,51),1))
+plotts.sample.wge(CM_52) #looks like some low freq?
+aic5.wge(CM_52) #picks ARMA(2,1) assume stationary
+aic5.wge(CM_52,type = "bic") #picks ARMA(0,0) 
+ljung.wge(CM_52)$pval #FTR Ho
+ljung.wge(CM_52, K = 48)$pval #FTR Ho
+#Going with white noise despite peak at 0 in Spec D. 
+#est = est.arma.wge(CM_52, p = 3, q = 2)
+#CM_52_AR2_MA1 = artrans.wge(CM_52,est$phi)
+predsPart = fore.aruma.wge(CM$part,s = 52, n.ahead = 20)
+```
+
+forecast Temp
+```{r ,echo=TRUE, results='hide'}
+plotts.sample.wge(CM$temp) #freq near .0192 (annual)
+CM_52 = artrans.wge(CM$temp, c(rep(0,51),1))
+plotts.sample.wge(CM_52) #looks like some low freq?
+aic5.wge(CM_52) #picks ARMA(0,0)
+aic5.wge(CM_52,type = "bic") #picks ARMA(0,0) 
+ljung.wge(CM_52)$pval
+ljung.wge(CM_52, K = 48)$pval #barely rejects
+acf(CM_52,lag.max = 48) # acf looks consistent with white noise
+predsTemp = fore.aruma.wge(CM$temp,s = 52, n.ahead = 20, limits = F)
+```
+
+Model **cmort** based on predicted **part** and **temp** using Multiple Linear Regression (MLR) with correlation errors.
+```{r}
+#This will add FWeek (52 week count) to the CM dataset
+CM$FWeek = as.factor(CM$Week%%52)
+ksfit = lm(cmort~temp+part+Week+FWeek, data = CM)
+phi = aic.wge(ksfit$residuals)
+fit = arima(CM$cmort,order = c(phi$p,0,0), xreg = cbind(CM$temp, CM$part, CM$Week, CM$FWeek))
+```
+
+Check for whiteness of residuals with a visual test and the Ljung-Box Test
+```{r}
+acf(fit$residuals)
+ljung.wge(fit$residuals) # pval = .066
+ljung.wge(fit$residuals, K = 48) # pval = .0058
+```
+
+load the forecasted Part and Temp in a data frame
+```{r}
+next20 = data.frame(temp = predsTemp$f, part = predsPart$f, Week = seq(509,528,1), FWeek = as.factor(seq(509,528,1)%%52))
+```
+
+get predictions - predict residuals   
+```{r ,echo=TRUE, results='hide'}
+plotts.sample.wge(ksfit$residuals)
+phi = aic.wge(ksfit$residuals)
+resids = fore.arma.wge(ksfit$residuals,phi = phi$phi,n.ahead = 20, limits = F)
+#predict trend manually
+preds = predict(ksfit, newdata = next20)
+
+predsFinal = preds + resids$f
+```
+
+
+Plot the next 20 cmort wrt time
+```{r}
+plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
+lines(seq(509,528,1), predsFinal, type = "l", col = "red")
+length(predsFinal)
+```
+
+To Find the ASE we need to forecast last 30 of the known series. 
+```{r}
+CMsmall = CM[2:478,]
+ksfit = lm(cmort~temp+part+Week+FWeek, data = CMsmall)
+phi = aic.wge(ksfit$residuals)
+fit = arima(CMsmall$cmort,order = c(phi$p,0,0), seasonal = list(order = c(1,0,0), period = 52), xreg = cbind(CMsmall$temp1, CMsmall$part, CMsmall$Week, CMsmall$FWeek))
+
+last30 = data.frame(temp = CM$temp[479:508], part = CM$part[479:508], Week = seq(479,508,1), FWeek = as.factor(seq(479,508,1)%%52))
+```
+
+Predict residuals manually  
+```{r}
+plotts.sample.wge(ksfit$residuals)
+phi = aic.wge(ksfit$residuals)
+resids = fore.arma.wge(ksfit$residuals,phi = phi$phi,n.ahead = 30, limits = F)
+```
+
+Predict trend manually  
+```{r}
+preds = predict(ksfit, newdata = last30)
+#Final using the trend and residuals
+predsFinal = preds + resids$f
+```
+
+Plot and print out the ASE
+```{r}
+plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
+lines(seq(479,508,1), predsFinal, type = "l", col = "red")
+
+ASE_ARMA2 = mean((CM$cmort[479:508] - predsFinal)^2,na.rm = TRUE)
+ASE_ARMA2
+```
+
+#### VAR Model
+
+**VAR Model Forecasts Seasonally Differenced Data**  
+
+Difference all series to make them stationary which is an assumption of VAR.  
+They do not have to be white, just stationary.  
+
+```{r}
+CM = read.csv("la_cmort_study.csv", header = TRUE)
+CM_52 = artrans.wge(CM$cmort,c(rep(0,51),1))
+Part_52 = artrans.wge(CM$part,c(rep(0,51),1))
+Temp_52 = artrans.wge(CM$temp,c(rep(0,51),1))
+
+#VARSelect on Differenced Data chooses 2
+VARselect(cbind(CM_52, Part_52, Temp_52),lag.max = 10, type = "both")
+
+#VAR with p = 2
+CMortDiffVAR = VAR(cbind(CM_52, Part_52, Temp_52),type = "both",p = 2)
+preds=predict(CMortDiffVAR,n.ahead=20)
+
+#We have predicted differences .... calculate actual cardiac mortalities 
+startingPoints = CM$cmort[428:457]
+CMortForcasts = preds$fcst$CM_52[,1:3] + startingPoints
+
+#Plot
+while (!is.null(dev.list()))  dev.off()
+plot(seq(1,508,1), CM$cmort, type = "l",xlim = c(0,528), ylab = "Cardiac Mortality", main = "20 Week Cardiac Mortality Forecast")
+lines(seq(509,528,1), as.data.frame(CMortForcasts)$fcst, type = "l", col = "red")
+
+ASE_VAR1 = mean((CM$cmort[489:508] - CMortForcasts[,1])^2)
+ASE_VAR1
+```
+
+### Modeling with the sales data set  
+
+find the ASE for forecasts of the last five observations of the sales data set example for both the MLE model (using ARIMA) and the VAR model we fit.  
+
+We fit several models using the arima() function, you should pick the one you feel is the best model (maybe with the lowest AIC?).
+
+Your slides should include each of the following:
+  
+  * Your code  
+  * Enough visual aids to describe how you calculated the ASE for each model  
+  * The ASE for each model  
+  * Which model you feel is better in that respect, and why.  
+
+Read in and visualize the sales data  
+```{r ,echo=TRUE, results='hide'}
+BSales = read.csv("businesssales.csv", header = TRUE)
+
+## Visualaze The Data
+head(BSales)
+#Make a matrix of plots with the BSales data set.
+ggpairs(BSales[2:5]) #matrix of scatter plots
+```
+
+#### MLR Modeling
+
+**Model 1**
+
+All data with no lag and no trend
+```{r}
+ksfit=lm(sales~ad_tv+ad_online+discount, data = BSales)
+aic.wge(ksfit$residuals,p=0:8, q=0)  # AIC picks p=7
+fit=arima(BSales$sales,order=c(7,0,0),xreg=BSales[,3:5])
+fit
+
+acf(fit$residuals)
+ltest = ljung.wge(fit$resid)
+ltest$pval
+```
+
+ASE for model with no lag and no trend (last 5)
+```{r}
+#Cut off the last 5
+BSales2 = BSales[1:95,]
+ksfit=lm(sales~ad_tv+ad_online+discount, data = BSales2)
+aic.wge(ksfit$residuals,p=0:8, q=0)  # AIC picks p=7
+fit=arima(BSales2$sales,order=c(7,0,0),xreg=cbind(BSales2$ad_tv,BSales2$ad_online,BSales2$discount))
+fit
+
+preds = predict(fit, newxreg = cbind(BSales$ad_tv[96:100],BSales$ad_online[96:100],BSales$discount[96:100]))
+ASE1 = mean((BSales$sales[96:100] - preds$pred)^2)
+ASE1
+
+while (!is.null(dev.list()))  dev.off()
+
+plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
+lines(seq(96,100,1), preds$pred, type = "l", col = "red")
+```
+
+**Model 2**
+
+ASE for model with no lag and trend (last 5)  
+```{r}
+BSales = read.csv("businesssales.csv", header = TRUE)
+#Create trend (length of the dataset)
+t=1:100
+#add trend to the BSales dataset
+BSales$t = t
+#Take off the last 5 for testing the forcast
+BSales2 = BSales[1:95,]
+#Trend (t) has been added to the model
+ksfit=lm(sales~t+ad_tv+ad_online+discount, data = BSales2)
+aic.wge(ksfit$residuals,p=0:8, q=0)  # AIC picks p=6
+fit=arima(BSales2$sales,order=c(6,0,0),xreg=cbind(BSales2$ad_tv,BSales2$ad_online,BSales2$t,BSales2$discount))
+fit
+
+preds = predict(fit, newxreg = cbind(BSales$ad_tv[96:100],BSales$ad_online[96:100],BSales$t[96:100],BSales$discount[96:100]))
+ASE2 = mean((BSales$sales[96:100] - preds$pred)^2)
+ASE2
+
+while (!is.null(dev.list()))  dev.off()
+plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
+lines(seq(96,100,1), preds$pred, type = "l", col = "red")
+```
+
+```{r}
+#Lagging Variables
+#Example:
+#With dplyr lag function
+library(dplyr)
+df = data.frame(Y = c(1,1,2,3,4,4,5,8),X1 = c(5,6,6,7,7,8,8,9))
+df$X1_L1 = dplyr::lag(df$X1,1)
+df$X1_L2 = dplyr::lag(df$X1,2)
+df
+
+# Model 3
+
+#Lagging BSales Ad Variables
+ad_tv1 = dplyr::lag(BSales$ad_tv,1)
+ad_online1 = dplyr::lag(BSales$ad_online,1)
+BSales$ad_tv1= ad_tv1
+BSales$ad_online1 = ad_online1
+
+
+#with trend and lagging
+
+# ASE for model with no lag and trend (last 5)
+t=1:100
+BSales$t = t
+BSales2 = BSales[2:95,]
+ksfit=lm(sales~t+ad_tv1+ad_online1+discount, data = BSales2)
+aic.wge(ksfit$residuals,p=0:8,q=0:0)  # AIC picks p=7
+fit = arima(BSales2$sales,order = c(7,0,0), xreg = cbind(BSales2$ad_tv1,BSales2$ad_online1,BSales2$t,BSales2$discount))
+fit
+
+
+preds = predict(fit, newxreg = cbind(BSales$ad_tv1[96:100],BSales$ad_online1[96:100],BSales$t[96:100],BSales$discount[96:100]))
+ASE3 = mean((BSales$sales[96:100] - preds$pred)^2)
+ASE3
+
+
+while (!is.null(dev.list()))  dev.off()
+plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
+lines(seq(96,100,1), preds$pred, type = "l", col = "red")
+
+
+
+
+
+####### Forecast Features 
+
+plotts.sample.wge(BSales$ad_tv)
+aic5.wge(BSales$ad_tv)
+est_ad_tv = est.arma.wge(BSales$ad_tv,p = 2, q = 2)
+ad_tvFORECAST = fore.arma.wge(BSales$ad_tv,phi = est_ad_tv$phi, theta = est_ad_tv$theta, n.ahead = 6)
+
+plotts.sample.wge(BSales$ad_online)
+aic5.wge(BSales$ad_online, p = 0:10)
+est_online = est.arma.wge(BSales$ad_online,p = 6)
+while (!is.null(dev.list()))  dev.off()
+plot.ts(BSales$ad_online[1:100])
+ad_onlineFORECAST = fore.arma.wge(BSales$ad_online,phi = est_online$phi, n.ahead = 6)
+
+
+
+#with trend and lagging
+
+ad_tvFORECAST1 = lag(ad_tvFORECAST,1)
+
+ad_onlineFORECAST1 = lag(ad_onlineFORECAST,1)
+
+# ASE for model with no lag and trend (last 5)
+t=1:100
+BSales$t = t
+BSales2 = BSales[2:95,]
+ksfit=lm(sales~t+ad_tv1+ad_online1, data = BSales2)
+aic.wge(ksfit$residuals,p=0:8,q=0:0)  # AIC picks p=7
+fit = arima(BSales2$sales,order = c(7,0,0), xreg = cbind(BSales2$ad_tv1,BSales2$ad_online1,BSales2$t))
+fit
+
+
+preds = predict(fit, newxreg = cbind(ad_tvFORECAST$f[2:6],ad_onlineFORECAST$f[2:6],BSales$t[96:100]))
+ASE3.5 = mean((BSales$sales[96:100] - preds$pred[1:5])^2)
+ASE3.5
+
+
+plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
+lines(seq(96,100,1), preds$pred[2:6], type = "l", col = "red")
+```
+
+
+
+####VAR MODELS
+
+**Model 4**
+
+```{r}
+
+BSVar = VAR(cbind(BSales2$sales,BSales2$ad_tv1,BSales2$ad_online1), type = "both", lag.max = 10)
+
+preds = predict(BSVar,n.ahead = 5)
+                  
+ASE4 = mean((BSales$sales[96:100] - preds$fcst$y1[,1])^2)
+ASE4
+
+while (!is.null(dev.list()))  dev.off()
+plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
+lines(seq(96,100,1), preds$fcst$y1[,1], type = "l", col = "red")
+```
+
+**Model 5**
+
+```{r}
+BSVar = VAR(cbind(BSales2$sales,BSales2$ad_tv,BSales2$ad_online), type = "both", lag.max = 10)
+
+preds = predict(BSVar,n.ahead = 5)
+
+ASE5 = mean((BSales$sales[96:100] - preds$fcst$y1[,1])^2)
+ASE5
+
+while (!is.null(dev.list()))  dev.off()
+plot(seq(1,100,1), BSales$sales[1:100], type = "l",xlim = c(0,100), ylab = "Business Sales", main = "5 Week Sales Forecast")
+lines(seq(96,100,1), preds$fcst$y1[,1], type = "l", col = "red")
+```
+
+
+
+
