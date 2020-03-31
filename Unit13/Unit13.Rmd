@@ -1,0 +1,177 @@
+---
+title: "Unit 13"
+author: "Chad Madding"
+date: "March 25, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(nnfor)
+library(readr)
+library(vars)
+library(forecast)
+SWA <- read_csv("swadelay.csv")
+```
+
+## Unit 13 - Neural Networks and Time Series   
+
+Using the Southwest Delay Data
+
+```{r Divide dataset}
+#Divide dataset into training and test set.  The last 36 months in the test set.
+SWATrain = ts(SWA$arr_delay[1:141],start= c(2004,1),frequency = 12)
+SWATest = ts(SWA$arr_delay[142:177],start = c(2015,10),frequency = 12)
+set.seed(2)
+```
+
+Fit the model with 50 reps using the mean
+```{r Fit the model SWA}
+#Fit the model with 50 reps using the mean
+fit.mlp = mlp(SWATrain,reps = 50,comb = "mean")
+fit.mlp
+```
+
+Fit 100 neural networks that includes a (1-B), (1-B6), and (1-B12) seasonal factor and also allows for AR fitting of the residuals after the differencing
+```{r}
+fit.mlp = mlp(SWATrain, difforder = c(1,6,12), allow.det.season = FALSE, reps = 100)
+fit.mlp
+```
+
+
+## Visualize the Neural Network
+
+This will let you know what the Neural Network looks like.  
+
+**Note:** pink nodes are for seasonal dummies and grey nodes are for lagged inputs.  
+
+```{r Visualize, echo=FALSE}
+# Visualize the Neural Network
+plot(fit.mlp)
+```
+
+Forecast with the fore.mlp function.
+```{r}
+fore.mlp = forecast(fit.mlp, h = 36)
+plot(fore.mlp)
+```
+
+Figure the ASE
+```{r Figure the ASE}
+ASE = mean((SWATest - fore.mlp$mean)^2)
+ASE
+```
+
+### Airlog Data
+
+```{r}
+library(tswge)
+data("airlog")
+```
+
+Remember this was the numbers we got in the past.
+```{r}
+Box = fore.aruma.wge(airlog,d = 1, s = 12, theta = c(.4,0,0,0,0,0,0,0,0,0,0,.6,-.24),n.ahead = 36,lastn = TRUE, limits = FALSE)
+BOX_ASE = mean((airlog[(144-36+1):144] - Box$f)^2)
+BOX_ASE
+Woodward = fore.aruma.wge(airlog,d = 1, s = 12, phi = c(-.36,-.05,-.14,-.11,.04,.09,-.02, .02,.17,.03,-.10,-.38),n.ahead = 36,lastn = TRUE, limits = FALSE)
+WOODWARD_ASE = mean((airlog[(144-36+1):144] - Woodward$f)^2)
+WOODWARD_ASE
+Parzen = fore.aruma.wge(airlog, d = 0, s = 12, phi = c(.74,0,0,0,0,0,0,0,0,0,0,.38,-.2812),n.ahead = 36,lastn = TRUE, limits = FALSE)
+PARZEN_ASE = mean((airlog[(144-36+1):144] - Parzen$f)^2)
+PARZEN_ASE
+```
+
+Let's set it up for MLP just doing the defaults.
+```{r}
+# First 108 months in the Training Set.
+set.seed(2)
+lairTrain = ts(airlog[1:108], frequency = 12, start = c(1949, 1))
+ # Last 36 months in the Test set. 
+lairTest = ts(airlog[109:144], frequency = 12, start = c(1958, 1))
+
+#Just the defaults
+#fit.mlp = mlp(lairTrain)
+#Try with a def order of 12
+fit.mlp = mlp(lairTrain, difforder = c(12))
+#automatically select the number of hidden nodes with fivefold cross validation
+fit.mlp = mlp(lairTrain, hd.auto.type = 'cv')
+
+fit.mlp
+```
+
+Visualize the MLP
+```{r}
+plot(fit.mlp)
+```
+
+Forecast our data.
+```{r}
+fore.mlp = forecast(fit.mlp, h = 36)
+plot(fore.mlp)
+```
+Get the ASE for your model. Just setting the default is not quite as good as above. 
+```{r}
+ASE = mean((lairTest - fore.mlp$mean)^2)
+ASE
+```
+
+We know that mlp() uses five hidden nodes by default, but can we do better at forecasting sales with more or less? 
+
+hd.auto.type is an option in the mlp() function that can select the number of hidden nodes for you.  
+
+Read the help for mlp() (?mlp), and see what the options are are for this option.  
+
+We would like to forecast the last 36 observations of the log airline passengers like we did before, but this time automatically select the number of hidden nodes with fivefold cross validation. Use set.seed(2) at the beginning of the code so that we get the same answers. 
+
+Did it take longer to run than without the hd.auto.type call?
+
+**Yes**
+
+### Multivariate NNs with the Sales Data  
+
+First just using the default and one variable.
+```{r}
+#read in the data
+BS <- read_csv("businesssales.csv")
+#BS is the Business data
+# Only Time as a regressor
+tBS80 = ts(BS$sales[1:80])
+set.seed(2)
+fit3 = mlp(tBS80)
+f = forecast(fit3, h = 20)
+plot(BS$sales[81:100],type = "l")
+lines(seq(1,20),f$mean, col = "blue")
+ASE = mean((BS$sales[81:100]-f$mean)^2)
+ASE
+```
+
+With additional Regressors using a dataframe for the multivariates.
+```{r}
+set.seed(2)
+tBS80 = ts(BS$sales[1:80])
+#Build a dataframe
+tBSx = data.frame(ad_tv = ts(BS$ad_tv), ad_online = ts(BS$ad_online, frequency = 7),discount = ts(BS$discount)) 
+fit3 = mlp(tBS80,xreg = tBSx, hd.auto.type = 'cv')
+f = forecast(fit3, h = 20, xreg = tBSx)
+plot(BS$sales[81:100],type = "l")
+lines(seq(1,20),f$mean, col = "blue")
+ASE = mean((BS$sales[81:100]-f$mean)^2)
+fit3
+plot(fit3)
+ASE
+```
+
+NN With additional Regressors
+```{r}
+set.seed(2)
+tBS80 = ts(BS$sales[1:80])
+tBSx = data.frame(ad_tv = ts(BS$ad_tv), ad_online = ts(BS$ad_online, frequency = 7),discount = ts(BS$discount)) 
+fit3 = mlp(tBS80,xreg = tBSx)
+f = forecast(fit3, h = 20, xreg = tBSx)
+plot(BS$sales[81:100],type = "l")
+lines(seq(1,20),f$mean, col = "blue")
+ASE = mean((BS$sales[81:100]-f$mean)^2)
+ASE
+```
+

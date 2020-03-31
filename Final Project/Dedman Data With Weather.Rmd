@@ -39,6 +39,7 @@ library(dplyr)
 library(forecast)
 library(ggplot2)
 library(ggthemes)
+library(nnfor)
 ```
 
 ### Describe Data Set  
@@ -62,33 +63,106 @@ str(HourlyWeather)
 Compactly Display the Structure of the data.
 ```{r Cleaning, echo=FALSE}
 #Data Cleaning
-#remove NA's from Temperature data
-HourlyWeather = HourlyWeather[which(!is.na(HourlyWeather$`HourlyDryBulbTemperature`)),]
 #Remove any rejected \ change state rows
 SMUSwipe = SMUSwipe[SMUSwipe[,2]=="CardAdmitted",]
-#Remove duplicate time ID swipes
-SMUSwipe = distinct(SMUSwipe, LDT, .keep_all = TRUE)
 #Create a Time column
 SMUSwipe$Time <- format(SMUSwipe$LDT,"%H:%M:%S")
 #Create a Day column
 SMUSwipe$Day <- format(SMUSwipe$LDT,"%d")
+
 #Create a Date column
 SMUSwipe$Date <- as.Date(SMUSwipe$LDT)
-#Create an Hour column
-SMUSwipe$Hour <- format(SMUSwipe$LDT,"%H")
 #Create a Day coloum
 SMUSwipe$Day <- weekdays(as.Date(SMUSwipe$LDT))
 #Create an Hours coloum for count
-SMUSwipe$Hours <- format(SMUSwipe$LDT,"%Y-%m-%d-%H")
-#Create a TempTime in SMUSwipe to merge Temperature data
-SMUSwipe$TempTime <- format(SMUSwipe$LDT,"%Y-%m-%d %H")
+SMUSwipe$Hours <- format(SMUSwipe$LDT,"%Y-%m-%d %H")
+#Create an Month coloum for count
+SMUSwipe$Month <- format(SMUSwipe$LDT,"%Y-%m")
+#Create an Hour coloum for count
+SMUSwipe$Hour <- format(SMUSwipe$LDT,"%H")
+```
+
+
+We had to clean up the hours for the merge.
+```{r Hour breakdown SMUSwipe}
+#Group hours
+SMUSwipe$TempTime <- format(SMUSwipe$LDT,"%Y-%m-%d")
+SMUSwipe$Hour <-ifelse(SMUSwipe$Hour <= '04','04',
+                      ifelse(SMUSwipe$Hour <= '08','08',
+                      ifelse(SMUSwipe$Hour <=  12, 12,
+                      ifelse(SMUSwipe$Hour <=  16, 16,
+                      ifelse(SMUSwipe$Hour <=  20, 20,
+                      ifelse(SMUSwipe$Hour <=  24, 24))))))
+SMUSwipe$TempTime<-paste(SMUSwipe$TempTime, SMUSwipe$Hour, sep=" ")
+```
+
+We had to clean up the hours for the merge.
+```{r Hour breakdown HourlyWeather}
+#Group all ID swipes by 15 minutes (quarter hour)
 #Create a TempTime in HourlyWeather to merge Temperature data
-HourlyWeather$TempTime <- format(HourlyWeather$DATE,"%Y-%m-%d %H")
-#Left join on TempTime to pull in hourly weather data
-SMUSwipe=left_join(SMUSwipe, HourlyWeather, 'TempTime')
+HourlyWeather$TempTime <- format(HourlyWeather$DATE,"%Y-%m-%d")
+HourlyWeather$Hour <- format(HourlyWeather$DATE,"%H")
+
+HourlyWeather$Hour <-ifelse(HourlyWeather$Hour <= '04','04',
+                      ifelse(HourlyWeather$Hour <= '08','08',
+                      ifelse(HourlyWeather$Hour <=  12, 12,
+                      ifelse(HourlyWeather$Hour <=  16, 16,
+                      ifelse(HourlyWeather$Hour <=  20, 20,
+                      ifelse(HourlyWeather$Hour <=  24, 24))))))
+HourlyWeather$TempTime<-paste(HourlyWeather$TempTime, HourlyWeather$Hour, sep=" ")
+#Recreate the Hour data
+SMUSwipe$Hour <- format(SMUSwipe$LDT,"%H")
+```
+
+```{r}
+#Merge on TempTime to pull in hourly weather data
+SMUSwipe = merge(SMUSwipe, HourlyWeather, by.x='TempTime', by.y='TempTime',all.x = TRUE, all.y = TRUE)
 #Remove dup after the left join
 SMUSwipe = distinct(SMUSwipe, LDT, .keep_all = TRUE)
+SMUSwipe = SMUSwipe[which(!is.na(SMUSwipe$`LDT`)),]
+
+#sum(is.na(SMUSwipe$HourlyDryBulbTemperature))
+
+#Fill in NA's from Temperature data with number close to the mean
+SMUSwipe$HourlyDryBulbTemperature[is.na(SMUSwipe$HourlyDryBulbTemperature)] <- 65
+SMUSwipe$HourlyAltimeterSetting[is.na(SMUSwipe$HourlyAltimeterSetting)] <- 30
+SMUSwipe$HourlyDewPointTemperature[is.na(SMUSwipe$HourlyDewPointTemperature)] <- 49
+SMUSwipe$HourlyRelativeHumidity[is.na(SMUSwipe$HourlyRelativeHumidity)] <- 58
+SMUSwipe$HourlyWindSpeed[is.na(SMUSwipe$HourlyWindSpeed)] <- 0
+
+#Renaming some information for ease of use
+SMUSwipe$Temperature <- SMUSwipe$HourlyDryBulbTemperature
+SMUSwipe$Hour <- SMUSwipe$Hour.x
+
+#Dropping some data we no longer need
+drop <- c("Message Type","Hour.x","Hour.y", "TempTime", "DATE", "HourlyPressureChange", "HourlyPressureTendency", "HourlySeaLevelPressure", "HourlyWetBulbTemperature", "HourlyDryBulbTemperature")
+SMUSwipe = SMUSwipe[,!(names(SMUSwipe) %in% drop)]
 ```
+
+Create and export hourley datasets for time series studies
+```{r}
+#Read in the data
+SMU = read.csv('SMUSwipe.csv',header = TRUE)
+#Look at the top of the data
+
+HourSwipes = dplyr::count(SMU,Hours)
+
+HourSwipesTemp = merge(HourSwipes,SMU, by='Hours')
+HourSwipesTemp = distinct(HourSwipesTemp, Hours, .keep_all = TRUE)
+
+colnames(HourSwipesTemp)[2] = "IDSwipes"
+
+#Dropping some data we no longer need
+drop <- c("Secondary.Object.Name", "LDT", "ID.", "Time", "Minutes", "Minutes_15", "interval_15")
+HourSwipesTemp = HourSwipesTemp[,!(names(HourSwipesTemp) %in% drop)]
+
+#Export the dataset
+write.csv(HourSwipesTemp,"DedmanHourleySwipe.csv", row.names = FALSE)
+
+head(HourSwipesTemp)
+```
+
+
 
 We now have a dataset with weather data along with card swipes.
 ```{r}
@@ -98,8 +172,8 @@ head(SMUSwipe)
 Hourly ID Swipes for all Turnstiles?
 ```{r Hour Group}
 #Group all badge swipes by the hour
-df = count(SMUSwipe, Hours)
-hourplot = count(SMUSwipe,Hour)
+
+hourplot = dplyr::count(SMUSwipe,Hour)
 
 hourplot %>%
   ggplot(aes(x=Hour,y=n, group=1))+
@@ -112,7 +186,7 @@ hourplot %>%
 
 What are the Daily ID Swipes for all Turnstiles?  
 ```{r}
-dayCount=count(SMUSwipe, Day)
+dayCount=dplyr::count(SMUSwipe, Day)
 dayCount$Day <- factor(dayCount$Day, levels= c("Sunday", "Monday", 
     "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
 
@@ -137,14 +211,20 @@ SMUSwipe$interval_15 <-ifelse(SMUSwipe$Minutes <= 15, 1, ifelse(SMUSwipe$Minutes
 SMUSwipe$Minutes_15<-paste(SMUSwipe$Hours, SMUSwipe$interval_15, sep=" ")
 ```
 
-Create a data set for each turnstile.  
+Look at turnstile information.  
+Create indivual turnstile data
 ```{r}
 #Create a dataset for each turnstyle
-SMUSwipeTurn1 = SMUSwipe[SMUSwipe[,4]=="DEDM (101.1LB)",]
-SMUSwipeTurn2 = SMUSwipe[SMUSwipe[,4]=="DEDM (101.2LB)",]
-SMUSwipeTurn3 = SMUSwipe[SMUSwipe[,4]=="DEDM (101.3LB)",]
+SMUSwipeTurn1 = SMUSwipe[SMU[,3]=="DEDM (101.1LB)",]
+SMUSwipeTurn2 = SMUSwipe[SMU[,3]=="DEDM (101.2LB)",]
+SMUSwipeTurn3 = SMUSwipe[SMU[,3]=="DEDM (101.3LB)",]
+```
 
-HTurn1 = count(SMUSwipeTurn1, Hour)
+```{r}
+
+df = dplyr::count(SMUSwipeTurn3, Hours)
+
+HTurn1 = dplyr::count(SMUSwipeTurn1, Hour)
 HTurn1 %>%
   ggplot(aes(x=Hour,y=n, group=1))+
   geom_line()+
@@ -153,7 +233,7 @@ HTurn1 %>%
   scale_colour_economist()+
   ggtitle('Hourly Card Swipes for Turnstile 1')
 
-HTurn2 = count(SMUSwipeTurn2, Hour)
+HTurn2 = dplyr::count(SMUSwipeTurn2, Hour)
 HTurn2 %>%
   ggplot(aes(x=Hour,y=n, group=1))+
   geom_line()+
@@ -162,7 +242,7 @@ HTurn2 %>%
   scale_colour_economist()+
   ggtitle('Hourly Card Swipes for Turnstile 2')
 
-HTurn3 = count(SMUSwipeTurn3, Hour)
+HTurn3 = dplyr::count(SMUSwipeTurn3, Hour)
 HTurn3 %>%
   ggplot(aes(x=Hour,y=n, group=1))+
   geom_line()+
@@ -177,7 +257,7 @@ Looks like turnstile 3 gets used more than the others but the pattern of usage l
 This data is anamonized but we can still see who are some of the top users.
 ```{r ID Count}
 #This will count up the times users swiped in. 
-IDCount = count(SMUSwipe, `ID#`)
+IDCount = dplyr::count(SMUSwipe, `ID#`)
 #Print off the top 10 users ordering nuency in decending order
 head(IDCount[order(IDCount$n, decreasing = TRUE),],10)
 ```
@@ -185,15 +265,67 @@ Look at some user data.
 ```{r}
 #Breakdown user numbers
 summary(IDCount$n)
-#how many uses
-count(IDCount)
+#how many users
+dplyr::count(IDCount)
 ```
 
 Convert the hourly data to time series.
 ```{r}
 #Hourley data
+#AnonDataTurnstile <- ts(df$n, frequency=6195, start=c(2019,1), end=c(2020,3))
 AnonDataTurnstile = ts(df$n)
+head(AnonDataTurnstile)
 ```
+
+Create different data sets for forcasting.
+
+#### Some information on frequency from the web  
+
+http://manishbarnwal.com/blog/2017/05/03/time_series_and_forecasting_using_R/
+
+**Daily** data There could be a weekly cycle or annual cycle. So the frequency could be 7 or 365.25.
+
+Some of the years have 366 days (leap years). So if your time series data has longer periods, it is better to use frequency = 365.25. This takes care of the leap year as well which may come in your data.
+
+**Weekly** data There could be an annual cycle. frequency = 52 and if you want to take care of leap years then use frequency = 365.25/7
+
+**Monthly** data Cycle is of one year. So frequency = 12
+
+**Quarterly** data Again cycle is of one year. So frequency = 4
+
+**Yearly** data Frequency = 1  
+
+#### How about frequency for smaller interval time series  
+
+**Hourly** The cycles could be a day, a week, a year. Corresponding frequencies could be 24, 24 X 7, 24 X 7 X 365.25
+
+**Half-hourly** The cycle could be a day, a week, a year. Corresponding frequencies could be 48, 48 X 7, 48 X 7 X 365.25
+
+**Minutes** The cycle could be hourly, daily, weekly, annual. Corresponding frequencies would be 60, 60 X 24, 60 X 24 X 7, 60 X 24 X 365.25
+
+**Seconds** The cycle could be a minute, hourly, daily, weekly, annual. Corresponding frequencies would be 60, 60 X 60, 60 X 60 X 24, 60 X 60 X 24 X 7, 60 X 60 X 24 X 365.25
+
+
+```{r}
+MonthCount <- dplyr::count(SMUSwipe, Month)
+MonthCount <- ts(MonthCount$n, start = c(2019,1), end = c(2020,3), frequency = 12)
+MonthCount
+
+DayCount <- dplyr::count(SMUSwipe, Date)
+DayCount <- ts(DayCount$n, start = c(2019,2), frequency = 365.25)
+DayCount
+
+SMUSwipe$WeekdayCount<-paste(SMUSwipe$Date, SMUSwipe$Day, sep=" ")
+WeekdayCount <- dplyr::count(SMUSwipe, WeekdayCount)
+WeekdayCount <- ts(WeekdayCount$n)
+WeekdayCount
+```
+
+```{r}
+plotts.sample.wge(DayCount)
+plotts.sample.wge(MonthCount)
+```
+
 
 ####Visualize what we have so far.
 
@@ -212,7 +344,6 @@ plotts.sample.wge(tail(x,length(x)/2))
 pacf(x)
 
 ```
-
 
 Start ID'ing the data by using the Box and Jeakins method with first differcing the data
 ```{r Differcing the data, echo=T, results='hide'}
@@ -242,13 +373,14 @@ Use aic5.wge() to identify estimates of p and q on the differanced data.
 aic5.wge(AnonDataTurnstile_diff)
 aic5.wge(AnonDataTurnstile_diff, type = "bic")
 x = AnonDataTurnstile_diff
+acf(x)
 pacf(x)
 ```
 
 Use the estimate of p and q to get estimates of the phis and thetas.
 ```{r estimate}
 #Use the estimate of p and q to get estimates of the phis and thetas.
-est = est.arma.wge(AnonDataTurnstile_diff, p = 4, q = 1)
+est = est.arma.wge(AnonDataTurnstile_diff, p = 4, q = 2)
 ```
 
 ```{r}
@@ -266,7 +398,14 @@ $$(1-B)(1-0.626B-0.119B^2-0.006B^3+0.195B^4)X_t=(1-0.973B)a_t\  \sigma^2_a=872.2
 
 ```{r}
 #forcast hour
-foreHour_diff=fore.arma.wge((tail(x,length(x)/72)), phi = est$phi, theta = est$theta, lastn = F, n.ahead = 48, limits=F)
+foreHour_diff=fore.arma.wge((tail(x,length(x)/72)), phi = est$phi, theta = est$theta, lastn = F, n.ahead = 24, limits=F)
+```
+
+TESTING Look at some of the weather data.
+```{r}
+#Conver to a time series.
+#WeatherTS <- ts()
+#plotts.sample.wge(WeatherTS)
 ```
 
 ####Seasonal Model  
@@ -295,12 +434,12 @@ Use artrans.wge() to get y. This is to remove the seasonality in the data.
 #In this data we are checking for nine months weekley number (36).
 y = artrans.wge(AnonDataTurnstile,phi.tr=c(c(rep(0,35),1)))
 # y is the transformed data
-#aic5.wge(y,p=0:15,q=0:6,type='bic')
+#aic5.wge(y,p=0:15,q=0:6,type='bic') #picked a ARMA(9,6)
 ```
 
-Based on the decision to fit an ARMA(15,5) model, we use the est.ar.wge command to obtain ML estimates.  
+Based on the decision to fit an ARMA(9,6) model, we use the est.ar.wge command to obtain ML estimates.  
 ```{r}
-AnonDataTurnstile.est155=est.arma.wge(y,p=15, q=5)
+AnonDataTurnstile.est155=est.arma.wge(y,p=9, q=6)
 AnonDataTurnstile.est155$phi
 AnonDataTurnstile.est155$theta
 AnonDataTurnstile.est155$avar
@@ -318,7 +457,7 @@ fore.aruma.wge(AnonDataTurnstile,phi=c(factAnonData$phi),s=36,n.ahead=48,plot=T,
 ```
 
 ```{r ASE2}
-p=15;q=5;s=3
+p=15;q=9;s=3
 es=tswge::est.arma.wge(x,p=p,q=q)
 
 ase = function(f,x){mean((f - tail(x,length(f)))^2)}
@@ -331,16 +470,55 @@ ase2=ase
 Trying the forecasting package on the hourly data
 ```{r forcasting package hourly data}
 #Trying the forcasting package
-AnonDataTurnstile.f = auto.arima(AnonDataTurnstile, stepwise=FALSE, approximation=FALSE, stationary = FALSE, seasonal = TRUE, trace = FALSE,max.p = 13,max.q = 5,max.P = 13,max.Q = 5)
+
+IDSwipes <- read_csv("DedmanDailySwipe.csv")
+
+#Convert to a time series at 365 days
+#IDSwipes = ts(IDSwipes$IDSwipes, start = c(2019,2), frequency = 365)
+
+IDSwipes = ts(IDSwipes$IDSwipes)
+
+#Divide dataset into training and test set.  The last 36 months in the test set.
+IDSwipes1st = (IDSwipes[1:100])
+IDSwipes2nd = (IDSwipes[101:421])
+
+AnonDataTurnstile.f = auto.arima(IDSwipes, stepwise=FALSE, approximation=FALSE, stationary = FALSE, seasonal = TRUE, trace = FALSE,max.p = 13,max.q = 5,max.P = 13,max.Q = 5)
 
 f=fore.aruma.wge(x, phi = c(1.195, 0.0297, 0.0842, 0.187, -1.169, .524, .076, .217, -.197, -.011,.023,-.033,.078,-.075,.0318), theta = c(.614, .302, .305, .624, -.993), s = 36, n.ahead = 48, plot = TRUE)
 
-HourForcast=forecast(AnonDataTurnstile.f, h=48, level = 95)
+DayForcast=forecast::forecast(AnonDataTurnstile.f, h=7, level = 95)
+DayForcast
+
 # Automatic ARIMA forecasts
-AnonDataTurnstile %>%
+IDSwipes %>%
   auto.arima() %>%
-  forecast(h=48) %>%
+  forecast(h=14) %>%
   autoplot()
 ```
 
+#### NN  
 
+Fit the model with the default settings forcasting 14 days out.
+```{r Fit the model Turn}
+
+df <- read_csv("DedmanDailySwipe.csv")
+
+#Convert to a time series at 365 days
+df = ts(df$IDSwipes, start = c(2019,2), frequency = 365)
+
+df
+
+fit.mlp.Dedman = mlp(df)
+
+fit.mlp.Dedman
+
+plot(fit.mlp.Dedman)
+
+fore.mlp.Dedman = forecast(fit.mlp.Dedman, h = 14)
+fore.mlp.Dedman
+
+plot(fore.mlp.Dedman)
+
+ASE_Dedman_NNid = mean((df[((421-14)+1):421] - fore.mlp.Dedman$mean)^2)
+ASE_Dedman_NNid
+```
