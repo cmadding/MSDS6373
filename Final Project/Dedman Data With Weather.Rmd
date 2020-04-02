@@ -42,10 +42,10 @@ library(ggthemes)
 library(nnfor)
 ```
 
-### Describe Data Set  
-####Time Series (Who, What, When, Where, Why and How)
 
-This is a time series data set collected from three turnstiles at the Dedman Center for Lifetime Sports on the Southern Methodist University campus. The data set is a record of the time of swipe, the turnstile used and an anonymized student ID number. This was collected from January 2nd, 2019 through March 11th, 2020 and consists of 414156 entries. Entry and error swipes are included in the data. It should be noted that the turnstiles are only used to enter the facility and ID swipe is not required to exit the building.  
+### Data Set Description  
+
+This is a time series data set collected from three turnstiles at the Dedman Center for Lifetime Sports on the Southern Methodist University campus. The data set is a record of the time of swipe, the turnstile used and an anonymized student ID number. This was collected from January 2nd, 2019 through March 11th, 2020 and consists of 414156 entries. Entry and error swipes are included in the data. It should be noted that the turnstiles are only used to enter the facility and ID swipe is not required to exit the building. We have also collected hourley weather data for the same time period. 
 
 **Read in the data**  
 ```{r Read in, echo=FALSE}
@@ -327,7 +327,7 @@ plotts.sample.wge(MonthCount)
 ```
 
 
-####Visualize what we have so far.
+#### Visualize what we have so far.
 
 **Plot the hourly data for all three turnstyles**
 ```{r Visualize turn hour, echo=T, results='hide'}
@@ -408,7 +408,7 @@ TESTING Look at some of the weather data.
 #plotts.sample.wge(WeatherTS)
 ```
 
-####Seasonal Model  
+#### Seasonal Model  
 
 Lets see what a Seasonal Model might look like
 

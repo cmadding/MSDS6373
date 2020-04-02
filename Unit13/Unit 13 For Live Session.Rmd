@@ -72,18 +72,26 @@ CMForcast = 10
 
 #Read in the data
 CM = read.csv('LA_Cmort_Study.csv',header = TRUE)
+
+#Lag 1
+CM$temp_1 = dplyr::lag(CM$temp,1)
+
 #Look at the top of the data
 head(CM)
+
+ccf(CM$cmort, CM$temp)
+
 #get the total rows
 CMRows = nrow(CM)
 
-CMsmall = CM[1:(CMRows-CMForcast),]
+CMsmall = CM[2:(CMRows-CMForcast),]
 
-CMsmallDF = data.frame(Week = ts(CMsmall$Week),temp = ts(CMsmall$temp), part = ts(CMsmall$part), temp = ts(CMsmall$temp))
+CMsmallDF = data.frame(Week = ts(CMsmall$Week),temp = ts(CMsmall$temp), part = ts(CMsmall$part),temp_1 = ts(CMsmall$temp_1))
+
 fit.mlp1 = mlp(ts(CMsmall$cmort),reps = 50,comb = "mean",xreg = CMsmallDF)
 fit.mlp1
 plot(fit.mlp1)
-CMDF = data.frame(Week = ts(CM$Week),temp = ts(CM$temp), part = ts(CM$part), temp = ts(CM$temp))
+CMDF = data.frame(Week = ts(CM$Week),temp = ts(CM$temp), part = ts(CM$part), temp_1 = ts(CM$temp_1))
 
 fore.mlp1 = forecast(fit.mlp1, h = CMForcast, xreg = CMDF)
 
@@ -155,6 +163,8 @@ SMU = read.csv('DedmanHourleySwipe.csv',header = TRUE)
 #Look at the top of the data
 head(SMU)
 
+plotts.sample.wge(SMU$IDSwipes)
+
 #Just using Feb. 11th to March 11th 2020 data
 SMU = SMU[5891:6360,]
 
@@ -167,7 +177,7 @@ ggpairs(SMU[c(2,10,17,18)])
 
 SMUsmallDF = data.frame(Temperature = ts(SMUsmall$Temperature), Humidity = ts(SMUsmall$HourlyRelativeHumidity),Hour = ts(SMUsmall$Hour))
 
-fit.mlp = mlp(ts(SMUsmall$IDSwipes),reps = 10,comb = "mean",xreg = SMUsmallDF)
+fit.mlp = mlp(ts(SMUsmall$IDSwipes),reps = 20,comb = "mean",xreg = SMUsmallDF)
 
 fit.mlp
 plot(fit.mlp)
@@ -175,6 +185,8 @@ plot(fit.mlp)
 SMUDF = data.frame(Temperature = ts(SMU$Temperature), Humidity = ts(SMU$HourlyRelativeHumidity), Hour = ts(SMU$Hour))
 
 fore.mlp = forecast(fit.mlp, h = 48 , xreg = SMUDF)
+
+fore.mlp
 
 plot(fore.mlp)
 

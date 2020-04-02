@@ -58,6 +58,14 @@ colnames(DaySwipesTemp)[2] = "IDSwipes"
 colnames(WeekSwipesTemp)[2] = "IDSwipes"
 colnames(MonthSwipesTemp)[2] = "IDSwipes"
 
+#Dropping some data we no longer need
+drop <- c("LDT", "Minutes", "Week", "Turnstile")
+HourSwipesTemp = HourSwipesTemp[,!(names(HourSwipesTemp) %in% drop)]
+DaySwipesTemp = DaySwipesTemp[,!(names(DaySwipesTemp) %in% drop)]
+WeekSwipesTemp = WeekSwipesTemp[,!(names(WeekSwipesTemp) %in% drop)]
+MonthSwipesTemp = MonthSwipesTemp[,!(names(MonthSwipesTemp) %in% drop)]
+
+
 #Export the dataset
 write.csv(HourSwipesTemp,"DedmanHourlySwipe.csv", row.names = FALSE)
 write.csv(DaySwipesTemp,"DedmanDailySwipe.csv", row.names = FALSE)
