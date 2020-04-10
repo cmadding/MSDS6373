@@ -1,0 +1,511 @@
+---
+title: "Using Turnstile Data To Forecast Student Worker Staffing"
+author: "Chad Madding, Shane Weinstock"
+date: "April 11, 2020"
+output:
+  html_document: default
+  word_document: default
+---
+
+### Clients  
+
+This report is being prepared for the management of the Dedman Center for Lifetime Sports at Southern Methodist University.  
+
+### Directive  
+
+We have been tasked with providing general usage of the facilities in the form of entry data. The main goal will be to use ID swipes as a response variable to assist in hiring patters for the facilities’ student staff. It is the goal of the report to assist in the spotting of trends and thus correctly identify staffing needs. Forecasting and general knowledge about building usage will also assist with budgeting needs. 
+
+### Data  
+
+The data provided to us has been collected from three turnstiles at the Dedman Center for Lifetime Sports on the campus of Southern Methodist University. The data set is a record of the time of swipe, the turnstile used, and an anonymized student ID number. The data was collected from January 2nd, 2019 through March 11th, 2020, and consists of 414,156 entries. Entry and error swipes are included in the data. It should be noted that the turnstiles are only used to enter the facility, and no swipe is required to exit the building. We have also collected hourly weather data from NOAA for the same period to assist in forecasting.  
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(readxl)
+library(tswge)
+library(plyr)
+library(dplyr)
+library(forecast)
+library(ggplot2)
+library(ggthemes)
+library(nnfor)
+library(vars)
+library(GGally)
+```
+
+```{r Read in, echo=FALSE, include=FALSE}
+#Read in the data
+SMUSwipe <- read_excel("AnonDataTurnstile.xlsx")
+weather <- read_csv("2085029.csv")
+#pull out just the hourly weather data
+HourlyWeather = weather[ , c(2, 42:57)]
+```
+
+```{r Cleaning, echo=FALSE}
+#Data Cleaning
+#Remove any rejected \ change state rows
+SMUSwipe = SMUSwipe[SMUSwipe[,2]=="CardAdmitted",]
+#Create a Time column
+SMUSwipe$Time <- format(SMUSwipe$LDT,"%H:%M:%S")
+#Create a Day column
+SMUSwipe$Day <- format(SMUSwipe$LDT,"%d")
+
+#Create a Date column
+SMUSwipe$Date <- as.Date(SMUSwipe$LDT)
+#Create a Day coloum
+SMUSwipe$Day <- weekdays(as.Date(SMUSwipe$LDT))
+#Create an Hours coloum for count
+SMUSwipe$Hours <- format(SMUSwipe$LDT,"%Y-%m-%d %H")
+#Create an Month coloum for count
+SMUSwipe$Month <- format(SMUSwipe$LDT,"%Y-%m")
+#Create an Hour coloum for count
+SMUSwipe$Hour <- format(SMUSwipe$LDT,"%H")
+```
+
+To get ready for merging the temperature data we needed to clean up the hours in the SMU data.
+```{r Hour breakdown SMUSwipe}
+#Group hours
+SMUSwipe$TempTime <- format(SMUSwipe$LDT,"%Y-%m-%d")
+SMUSwipe$Hour <-ifelse(SMUSwipe$Hour <= '04','04',
+                      ifelse(SMUSwipe$Hour <= '08','08',
+                      ifelse(SMUSwipe$Hour <=  12, 12,
+                      ifelse(SMUSwipe$Hour <=  16, 16,
+                      ifelse(SMUSwipe$Hour <=  20, 20,
+                      ifelse(SMUSwipe$Hour <=  24, 24))))))
+SMUSwipe$TempTime<-paste(SMUSwipe$TempTime, SMUSwipe$Hour, sep=" ")
+```
+
+We made the data the same format for the weather data as well as in the SMU information.
+```{r Hour breakdown HourlyWeather}
+#Create a TempTime in HourlyWeather to merge Temperature data
+HourlyWeather$TempTime <- format(HourlyWeather$DATE,"%Y-%m-%d")
+HourlyWeather$Hour <- format(HourlyWeather$DATE,"%H")
+
+HourlyWeather$Hour <-ifelse(HourlyWeather$Hour <= '04','04',
+                      ifelse(HourlyWeather$Hour <= '08','08',
+                      ifelse(HourlyWeather$Hour <=  12, 12,
+                      ifelse(HourlyWeather$Hour <=  16, 16,
+                      ifelse(HourlyWeather$Hour <=  20, 20,
+                      ifelse(HourlyWeather$Hour <=  24, 24))))))
+HourlyWeather$TempTime<-paste(HourlyWeather$TempTime, HourlyWeather$Hour, sep=" ")
+#Recreate the Hour data
+SMUSwipe$Hour <- format(SMUSwipe$LDT,"%H")
+```
+Here we are merging on TempTime to pull in hourly weather data
+```{r}
+#Merge on TempTime to pull in hourly weather data
+SMUSwipe = merge(SMUSwipe, HourlyWeather, by.x='TempTime', by.y='TempTime',all.x = TRUE, all.y = TRUE)
+#Remove dup after the left join
+SMUSwipe = distinct(SMUSwipe, LDT, .keep_all = TRUE)
+SMUSwipe = SMUSwipe[which(!is.na(SMUSwipe$`LDT`)),]
+
+#sum(is.na(SMUSwipe$HourlyDryBulbTemperature))
+
+#Fill in NA's from Temperature data with number close to the mean
+SMUSwipe$HourlyDryBulbTemperature[is.na(SMUSwipe$HourlyDryBulbTemperature)] <- 65
+SMUSwipe$HourlyAltimeterSetting[is.na(SMUSwipe$HourlyAltimeterSetting)] <- 30
+SMUSwipe$HourlyDewPointTemperature[is.na(SMUSwipe$HourlyDewPointTemperature)] <- 49
+SMUSwipe$HourlyRelativeHumidity[is.na(SMUSwipe$HourlyRelativeHumidity)] <- 58
+SMUSwipe$HourlyWindSpeed[is.na(SMUSwipe$HourlyWindSpeed)] <- 0
+
+#Renaming some information for ease of use
+SMUSwipe$Temperature <- SMUSwipe$HourlyDryBulbTemperature
+SMUSwipe$Hour <- SMUSwipe$Hour.x
+
+#Dropping some data we no longer need
+drop <- c("Message Type","Hour.x","Hour.y", "TempTime", "DATE", "HourlyPressureChange", "HourlyPressureTendency", "HourlySeaLevelPressure", "HourlyWetBulbTemperature", "HourlyDryBulbTemperature")
+SMUSwipe = SMUSwipe[,!(names(SMUSwipe) %in% drop)]
+
+#Export the dataset
+write.csv(SMUSwipe,"SMUSwipe.csv", row.names = FALSE)
+
+```
+
+Create and export datasets for time series studies
+```{r}
+#Read in the data
+SMU = read.csv('SMUSwipe.csv',header = TRUE)
+#Look at the top of the data
+head(SMU)
+
+#Dropping some data we no longer need
+drop <- c("ID.", "interval_15", "Minutes_15","Time")
+SMU = SMU[,!(names(SMU) %in% drop)]
+
+SMU$Week<-paste(SMU$Month, SMU$Day, sep=" ")
+
+#Renaming some information for ease of use
+#SMUSwipe$Temperature <- SMUSwipe$HourlyDryBulbTemperature
+#SMUSwipe$Hour <- SMUSwipe$Hour.x
+
+colnames(SMU)[2] = "Turnstile"
+
+SMU$Date <- as.Date(SMU$LDT)
+
+# Extract day of the week (Saturday = 6)
+SMU$Week_Day <- as.numeric(format(format.Date(SMU$LDT,"%w")))
+
+# Adjust end-of-week date (first saturday from the original Date)
+SMU$End_of_Week <- SMU$Date + (6 - SMU$Week_Day)
+
+HourSwipes = dplyr::count(SMU,Hours)
+DaySwipes = dplyr::count(SMU,Date)
+WeekSwipes = dplyr::count(SMU,End_of_Week)
+MonthSwipes = dplyr::count(SMU,Month)
+
+HourSwipesTemp = merge(HourSwipes,SMU, by='Hours')
+HourSwipesTemp = distinct(HourSwipesTemp, Hours, .keep_all = TRUE)
+
+DaySwipesTemp = merge(DaySwipes,SMU, by='Date')
+DaySwipesTemp = distinct(DaySwipesTemp, Date, .keep_all = TRUE)
+# Aggregate over Date and Temperature
+DaySwipesTemp$DayTemperature = aggregate(Temperature~Date, FUN=mean, data=SMU, na.rm=TRUE)
+DaySwipesTemp = DaySwipesTemp[,!(names(DaySwipesTemp) %in% 'Temperature')]
+
+WeekSwipesTemp = merge(WeekSwipes,SMU, by='End_of_Week')
+WeekSwipesTemp = distinct(DaySwipesTemp, End_of_Week, .keep_all = TRUE)
+# Aggregate over week and Temperature
+WeekSwipesTemp$WeekTemperature = aggregate(Temperature~End_of_Week, FUN=mean, data=SMU, na.rm=TRUE)
+WeekSwipesTemp = WeekSwipesTemp[,!(names(WeekSwipesTemp) %in% 'Temperature')]
+
+MonthSwipesTemp = merge(MonthSwipes,SMU, by='Month')
+MonthSwipesTemp = distinct(MonthSwipesTemp, Month, .keep_all = TRUE)
+# Aggregate over week and Temperature
+MonthSwipesTemp$MonthTemperature = aggregate(Temperature~Month, FUN=mean, data=SMU, na.rm=TRUE)
+MonthSwipesTemp = MonthSwipesTemp[,!(names(MonthSwipesTemp) %in% 'Temperature')]
+
+#Change n to IDSwipes
+colnames(HourSwipesTemp)[2] = "IDSwipes"
+colnames(DaySwipesTemp)[2] = "IDSwipes"
+colnames(WeekSwipesTemp)[2] = "IDSwipes"
+colnames(MonthSwipesTemp)[2] = "IDSwipes"
+
+#Dropping some data we no longer need
+drop <- c("LDT", "Minutes", "Week", "Turnstile")
+HourSwipesTemp = HourSwipesTemp[,!(names(HourSwipesTemp) %in% drop)]
+DaySwipesTemp = DaySwipesTemp[,!(names(DaySwipesTemp) %in% drop)]
+WeekSwipesTemp = WeekSwipesTemp[,!(names(WeekSwipesTemp) %in% drop)]
+MonthSwipesTemp = MonthSwipesTemp[,!(names(MonthSwipesTemp) %in% drop)]
+
+#Export the dataset
+write.csv(HourSwipesTemp,"DedmanHourlySwipe.csv", row.names = FALSE)
+write.csv(DaySwipesTemp,"DedmanDailySwipe.csv", row.names = FALSE)
+write.csv(WeekSwipesTemp,"DedmanWeeklySwipe.csv", row.names = FALSE)
+write.csv(MonthSwipesTemp,"DedmanMonthlySwipe.csv", row.names = FALSE)
+```
+
+We now have a data set with weather data along with card swipes.
+```{r}
+head(SMUSwipe)
+```
+
+**Hourly Totals:** 
+
+In helping access the staffing needs we wanted to get a snapshot of the general usage of the facilities.
+
+```{r Hour Group}
+#Group all badge swipes by the hour
+
+hourplot = dplyr::count(SMUSwipe,Hour)
+
+hourplot %>%
+  ggplot(aes(x=Hour,y=n, group=1))+
+  geom_line()+
+  geom_point()+
+  theme_economist()+
+  scale_colour_economist()+
+  ggtitle('Hourly ID Swipes for all Turnstiles')
+```
+
+What are the Daily ID Swipes for all Turnstiles?  
+```{r}
+dayCount=dplyr::count(SMUSwipe, Day)
+dayCount$Day <- factor(dayCount$Day, levels= c("Sunday", "Monday", 
+    "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+
+dayCount=dayCount[order(dayCount$Day), ]
+  
+dayCount %>%
+  ggplot(aes(x=Day,y=n, group=1))+
+  geom_line()+
+  geom_point()+
+  theme_economist()+
+  scale_colour_economist()+
+  theme_economist()+
+  ggtitle('Daily ID Swipes for all Turnstiles')+
+  ylab('ID Swipes')
+```
+
+Top Days look to be Monday, Tuesday and Wednesday.
+
+Look at turnstile information.  
+Create individual turnstile data
+```{r}
+#Create a dataset for each turnstyle
+SMUSwipeTurn1 = SMUSwipe[SMUSwipe[,3]=="DEDM (101.1LB)",]
+SMUSwipeTurn2 = SMUSwipe[SMUSwipe[,3]=="DEDM (101.2LB)",]
+SMUSwipeTurn3 = SMUSwipe[SMUSwipe[,3]=="DEDM (101.3LB)",]
+```
+
+```{r}
+
+df = dplyr::count(SMUSwipeTurn3, Hours)
+
+HTurn1 = dplyr::count(SMUSwipeTurn1, Hour)
+HTurn1 %>%
+  ggplot(aes(x=Hour,y=n, group=1))+
+  geom_line()+
+  geom_point()+
+  theme_economist()+
+  scale_colour_economist()+
+  ggtitle('Hourly Card Swipes for Turnstile 1')
+
+HTurn2 = dplyr::count(SMUSwipeTurn2, Hour)
+HTurn2 %>%
+  ggplot(aes(x=Hour,y=n, group=1))+
+  geom_line()+
+  geom_point()+
+  theme_economist()+
+  scale_colour_economist()+
+  ggtitle('Hourly Card Swipes for Turnstile 2')
+
+HTurn3 = dplyr::count(SMUSwipeTurn3, Hour)
+HTurn3 %>%
+  ggplot(aes(x=Hour,y=n, group=1))+
+  geom_line()+
+  geom_point()+
+  theme_economist()+
+  scale_colour_economist()+
+  ggtitle('Hourly Card Swipes for Turnstile 3')
+```
+
+Looks like turnstile 3 gets used more than the others but the pattern of usage looks the same across each.  
+
+This data is anamonized but we can still see who are some of the top users.
+```{r ID Count}
+#This will count up the times users swiped in. 
+IDCount = dplyr::count(SMUSwipe, `ID#`)
+#Print off the top 10 users ordering nuency in decending order
+head(IDCount[order(IDCount$n, decreasing = TRUE),],10)
+```
+Look at some user data.
+```{r}
+#Breakdown user numbers
+summary(IDCount$n)
+#how many users
+dplyr::count(IDCount)
+```
+
+#### Stationarity
+
+**To address stationarity we will first visualize the daily count data.**  
+
+After reading in the data we will convert it to a time series object.
+```{r Visualize daily, echo=T, results='hide'}
+
+#Read in the daily data set
+DedmanDailySwipe <- read_csv("DedmanDailySwipe.csv")
+
+#Conver the IDSwipes data to Time Series 
+DedmanDailyTS = ts(DedmanDailySwipe$IDSwipes, start = c(2019,2), frequency = 365)
+head(DedmanDailyTS)
+DedmanDailyTS
+
+# Test for Conditions we Plot the daily data
+#The plotts will give a large view of all the data
+DedmanDailySwipe %>%
+  ggplot(aes(x=Date,y=IDSwipes, group=1))+
+  geom_line()+
+  geom_point()+
+  theme_economist()+
+  scale_colour_economist()+
+  ggtitle('Daily Card Swipe Counts')
+```
+
+Looking at the data we see dips in the usage during Spring Break, Summer and Winter Break. This is typical for the area the data comes from.
+
+We can check to see if the mean is constant by comparing the overall mean of the data set to a rolling mean.
+
+```{r Rolling Mean}
+#To to check for a constant mean
+#Rolling Mean vs. the data set mean
+DedmanRollMean = mean(rollmean(DedmanDailyTS, 7))
+DedmanRollMean
+DedmanMean = mean(DedmanDailyTS)
+DedmanMean
+#Weekly Rolling Mean = 933.7 Mean = 929.4
+```
+A weekly rolling mean turns out to be 934 which is very close to the overall mean of 929.
+One more bit of evidence pointing to the mean not being dependent on time.
+
+```{r Daily plotts sample}
+#plotts.sample will give us an over view of 
+TurnPlotDaily=plotts.sample.wge(DedmanDailyTS)
+plotts.sample.wge(head(DedmanDailyTS,length(DedmanDailyTS)/2))
+plotts.sample.wge(tail(DedmanDailyTS,length(DedmanDailyTS)/2))
+
+pacf(DedmanDailyTS)
+```
+
+#### Seasonal Model  
+
+Lets see what a Seasonal Model might look like
+
+Look at the data again.
+```{r Seasonal parzen, echo=T, results='hide'}
+plotts.sample.wge(DedmanDailyTS)
+```
+
+There are a few peeks we can look at for a sign of seasonality in the data.  
+This data is from a collage so we might expect to find a nine month pattern accounting for the three months of Summer break.  
+We found the factors at 36 seemed to match up. This would coinside with a 9 month weekly pattern.
+
+```{r Factor Table}
+#Factor tables
+factDedmanDaily=est.ar.wge(DedmanDailyTS,p=7,type='burg')
+factor.wge(c(0,0,0,0,0,0,1)) #(1-B^7)
+```
+
+Use artrans.wge() to get y. This is to remove the seasonality in the data.  
+```{r remove the seasonality}
+#Use artrans.wge() to get y. This is to remove the seasonality in the data.
+#In this data we are checking for a weekley trend (7).
+y = artrans.wge(DedmanDailyTS,phi.tr=c(0,0,0,0,0,0,1))
+# y is the transformed data
+#aic5.wge(y,p=0:15,q=0:9,type='aic') #AIC picked a ARMA(1,7)=11.48657
+```
+
+Based on the decision to fit an ARMA(1,7) model, we use the est.ar.wge command to obtain Maximum Likelihood (ML) estimates.  
+```{r}
+DedmanDailyTS.est17=est.arma.wge(y,p=1, q=7)
+DedmanDailyTS.est17$phi
+DedmanDailyTS.est17$theta
+DedmanDailyTS.est17$avar
+
+mean(DedmanDailyTS)
+```
+
+#### Final Seasonal Model
+$$(1-B^{7})(1-0.476B)(X_t-929.4)=(1+0.165B+0.076B^2+0.091B^3+0.084B^4+0.143B^5+0.246B^6-0.471B^7)a_t\  \sigma^2_a=93255.27$$
+```{r season fore, echo=T, results='hide'}
+seasonFore=fore.aruma.wge(DedmanDailyTS,phi=c(DedmanDailyTS.est17$phi),theta=c(DedmanDailyTS.est17$theta),s=7,n.ahead=14,limits=F)
+seasonFore$f
+
+fore.aruma.wge(DedmanDailyTS,phi=c(DedmanDailyTS.est17$phi),theta=c(DedmanDailyTS.est17$theta),s=7,n.ahead=14,plot=T,lastn=T,limits=F)
+```
+
+```{r Season ASE}
+p=1;q=7;s=7
+x=DedmanDailyTS
+es=tswge::est.arma.wge(x,p=p,q=q)
+
+ase = function(f,x){mean((f - tail(x,length(f)))^2)}
+m = tswge::fore.aruma.wge(x,phi = es$phi,theta = es$theta,s=s,n.ahead = 14,lastn = T, limits = F)
+ase = ase(m$f,x)
+message("ASE is: ",ase)
+ASE_Season=ase
+```
+
+#### 	Neural Network with IDSwipes as the Response Variable.  
+
+```{r Neural Network with IDSwipes}
+#We will forcast out two weeks
+SMUForcast = 14
+
+#Read in the data
+SMU = read.csv('DedmanDailySwipe.csv',header = TRUE)
+#get the total rows
+CMRows = nrow(SMU)
+#To look at just the last x number of days change this to a real number
+SMUDays= CMRows
+
+SMU = SMU[((CMRows-SMUDays)+1):(CMRows),]
+#Look at the top of the data
+head(SMU)
+
+#ggpairs(SMU[c(2,3,6,7,10,12,16,18,21)])
+
+#get the total rows
+CMRows = nrow(SMU)
+
+plotts.sample.wge(SMU$IDSwipes)
+
+SMUsmall = SMU[1:(CMRows-SMUForcast),]
+
+SMUsmallDF = data.frame(Temperature = ts(SMUsmall$DayTemperature.Temperature), Humidity = ts(SMUsmall$HourlyRelativeHumidity),Day = ts(SMUsmall$Week_Day), DewPoint = ts(SMUsmall$HourlyDewPointTemperature))
+
+SMUsmallDF <- na.omit(SMUsmallDF)
+
+fit.mlp = mlp(ts(SMUsmall$IDSwipes),reps = 50,comb = "median", xreg = SMUsmallDF)
+
+fit.mlp
+plot(fit.mlp)
+
+SMUDF = data.frame(Temperature = ts(SMU$DayTemperature.Temperature), Humidity = ts(SMU$HourlyRelativeHumidity),Day = ts(SMU$Week_Day), DewPoint = ts(SMU$HourlyDewPointTemperature))
+
+fore.mlp = forecast(fit.mlp, h = SMUForcast , xreg = SMUDF)
+
+fore.mlp
+
+plot(fore.mlp)
+
+ASE_SMU_NN = mean((SMU$IDSwipes[((CMRows-SMUForcast)+1):CMRows] - fore.mlp$mean)^2)
+ASE_SMU_NN
+
+while (!is.null(dev.list()))  dev.off()
+par(mfrow = c(2,1))
+```
+
+```{r}
+#Plot
+plot(seq(1,CMRows,1), SMU$IDSwipes, type = "l",xlim = c(0,CMRows), ylab = "ID Swipes", main = paste(SMUForcast," Day Turnstile Forecast"))
+lines(seq(((CMRows-SMUForcast)+1),CMRows,1), fore.mlp$mean, type = "l", col = "red")
+
+#Plot
+plot(seq(((CMRows-SMUForcast)+1),CMRows,1), SMU$IDSwipes[((CMRows-SMUForcast)+1):CMRows], type = "l",xlim = c((CMRows-SMUForcast)+1,CMRows), ylab = "ID Swipes", main = paste(SMUForcast," Day Turnstile Forecast"))
+lines(seq(((CMRows-SMUForcast)+1),CMRows,1), fore.mlp$mean, type = "l", col = "red")
+```
+
+
+SMU data NN using the default settings.
+```{r SMU Dedman default}
+
+fit.mlp = mlp(ts(SMUsmall$IDSwipes))
+fit.mlp
+plot(fit.mlp)
+fore.mlp = forecast(fit.mlp, h = 14)
+plot(fore.mlp)
+
+ASE_SMU_NNid = mean((SMU$IDSwipes[((CMRows-SMUForcast)+1):CMRows] - fore.mlp$mean)^2)
+ASE_SMU_NNid
+```
+
+#### VAR with IDSwipes as the Response Variable.
+
+```{r VAR with IDSwipe}
+#VAR
+SMForcast = 14
+SM = SMU
+#get the total rows
+SMRows = nrow(SM)
+SMsmall = SM[1:(SMRows-SMForcast),]
+
+#VAR Model 3 seasonal with Lag 1 Temp
+#SMsmall$temp_1 = dplyr::lag(SMsmall$Temperature,1)
+
+VARselect(cbind(SMsmall$IDSwipes[1:(SMRows-SMForcast)], SMsmall$Temperature[1:(SMRows-SMForcast)], SMsmall$HourlyRelativeHumidity[1:(SMRows-SMForcast)],SMsmall$Day[1:(SMRows-SMForcast)]))
+
+VAR_SM = VAR(cbind(SMsmall$IDSwipes[1:(SMRows-SMForcast)], SMsmall$Temperature[1:(SMRows-SMForcast)], SMsmall$HourlyRelativeHumidity[1:(SMRows-SMForcast)],SMsmall$Day[1:(SMRows-SMForcast)]))
+
+pred = predict(VAR_SM,n.ahead = SMForcast)
+
+#while (!is.null(dev.list()))  dev.off()
+
+plot(SM$IDSwipes, type = "l")
+lines(seq((SMRows-SMForcast)+1,SMRows,1),pred$fcst$y1[,1],col = "red")
+
+ASE_SMU_VAR = mean((SM$IDSwipes[((SMRows-SMForcast)+1):SMRows] - pred$fcst$y1[1:SMForcast])^2)
+
+ASE_SMU_VAR
+```

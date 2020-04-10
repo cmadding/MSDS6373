@@ -1,0 +1,115 @@
+---
+title: "Neural Network and VAR with Hourly Data"
+author: "Chad Madding"
+date: "4/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(readxl)
+library(tswge)
+library(plyr)
+library(dplyr)
+library(forecast)
+library(ggplot2)
+library(ggthemes)
+library(nnfor)
+library(vars)
+```
+
+#### 	Neural Network with IDSwipes as the Response Variable.  
+
+```{r Neural Network with IDSwipes}
+#Neural Network with IDSwipes
+#We will forcast out 48 Hours
+SMUForcast = 48
+
+#Read in the data
+SMU = read.csv('DedmanHourlySwipe.csv',header = TRUE)
+#Look at the top of the data
+head(SMU)
+
+plotts.sample.wge(SMU$IDSwipes)
+
+#Just using Feb. 11th to March 11th 2020 data
+SMU = SMU[5891:6360,]
+
+#get the total rows
+CMRows = nrow(SMU)
+
+SMUsmall = SMU[1:(CMRows-SMUForcast),]
+
+SMUsmallDF = data.frame(Temperature = ts(SMUsmall$Temperature), Humidity = ts(SMUsmall$HourlyRelativeHumidity),Hour = ts(SMUsmall$Hour))
+
+fit.mlp = mlp(ts(SMUsmall$IDSwipes),reps = 10,comb = "mean",xreg = SMUsmallDF)
+
+fit.mlp
+plot(fit.mlp)
+
+SMUDF = data.frame(Temperature = ts(SMU$Temperature), Humidity = ts(SMU$HourlyRelativeHumidity), Hour = ts(SMU$Hour))
+
+fore.mlp = forecast(fit.mlp, h = 48 , xreg = SMUDF)
+
+fore.mlp
+
+plot(fore.mlp)
+
+ASE_SMU_NN = mean((SMU$IDSwipes[((CMRows-SMUForcast)+1):CMRows] - fore.mlp$mean)^2)
+ASE_SMU_NN
+
+while (!is.null(dev.list()))  dev.off()
+par(mfrow = c(2,1))
+
+#Plot
+plot(seq(1,CMRows,1), SMU$IDSwipes, type = "l",xlim = c(0,CMRows), ylab = "ID Swipes", main = paste(SMUForcast," Hour Turnstile Forecast"))
+lines(seq(((CMRows-SMUForcast)+1),CMRows,1), fore.mlp$mean, type = "l", col = "red")
+
+#Plot
+plot(seq(((CMRows-SMUForcast)+1),CMRows,1), SMU$IDSwipes[((CMRows-SMUForcast)+1):CMRows], type = "l",xlim = c((CMRows-SMUForcast)+1,CMRows), ylab = "ID Swipes", main = paste(SMUForcast," Hour Turnstile Forecast"))
+lines(seq(((CMRows-SMUForcast)+1),CMRows,1), fore.mlp$mean, type = "l", col = "red")
+```
+
+SMU data NN using the deafult settings.
+```{r SMU Dedman default}
+fit.mlp = mlp(ts(SMUsmall$IDSwipes))
+fit.mlp
+plot(fit.mlp)
+fore.mlp = forecast(fit.mlp, h = 48)
+plot(fore.mlp)
+
+ASE_SMU_NNid = mean((SMU$IDSwipes[((CMRows-SMUForcast)+1):CMRows] - fore.mlp$mean)^2)
+ASE_SMU_NNid
+```
+
+#### VAR with IDSwipes as the Response Variable.
+
+```{r VAR with IDSwipe}
+#VAR
+SMForcast = 48
+SM = read.csv('DedmanHourlySwipe.csv',header = TRUE)
+#Just using Feb. 11th to March 11th 2020 data
+SM = SM[5891:6360,]
+#Just using March 1st to March 11th 2020 data
+#SM = SM[6189:6360,]
+#get the total rows
+SMRows = nrow(SM)
+SMsmall = SM[1:(SMRows-SMForcast),]
+
+#VAR Model 3 seasonal with Lag 1 Temp
+SMsmall$temp_1 = dplyr::lag(SMsmall$Temperature,1)
+
+VARselect(cbind(SMsmall$IDSwipes[1:(SMRows-SMForcast)], SMsmall$Temperature[1:(SMRows-SMForcast)], SMsmall$HourlyRelativeHumidity[1:(SMRows-SMForcast)],SMsmall$Hours[1:(SMRows-SMForcast)]))
+
+VAR_SM = VAR(cbind(SMsmall$IDSwipes[1:(SMRows-SMForcast)], SMsmall$Temperature[1:(SMRows-SMForcast)], SMsmall$HourlyRelativeHumidity[1:(SMRows-SMForcast)],SMsmall$Hours[1:(SMRows-SMForcast)]))
+
+pred = predict(VAR_SM,n.ahead = SMForcast)
+
+plot(SM$IDSwipes, type = "l")
+lines(seq((SMRows-SMForcast)+1,SMRows,1),pred$fcst$y1[,1],col = "red")
+
+ASE_SMU_VAR = mean((SM$IDSwipes[((SMRows-SMForcast)+1):SMRows] - pred$fcst$y1[1:SMForcast])^2)
+
+ASE_SMU_VAR
+```

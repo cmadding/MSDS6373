@@ -1,0 +1,69 @@
+---
+title: "Using Prophet on the Dedman Data"
+author: "Chad Madding"
+date: "4/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("prophet")
+library(prophet)
+```
+
+## R API
+
+In R, we use the normal model fitting API. We provide a prophet function that performs fitting and returns a model object. You can then call predict and plot on this model object.  
+
+All information available here:
+https://facebook.github.io/prophet/docs/quick_start.html#r-api  
+
+First we read in the data and create the outcome variable. As in the Python API, this is a dataframe with columns ds and y, containing the date and numeric value respectively. The ds column should be YYYY-MM-DD for a date, or YYYY-MM-DD HH:MM:SS for a timestamp.
+
+```{r read in data}
+df <- read.csv('DedmanDailySwipe.csv')
+
+colnames(df)[1] = "ds"
+colnames(df)[2] = "y"
+
+df = df[ , c(1, 2)]
+```
+
+We call the prophet function to fit the model. The first argument is the historical dataframe. Additional arguments control how Prophet fits the data and are described in later pages of this documentation.  
+
+```{r prophet function, echo=FALSE}
+
+m <- prophet(df, daily.seasonality='auto', weekly.seasonality='auto', yearly.seasonality=TRUE)
+```
+
+Predictions are made on a dataframe with a column ds containing the dates for which predictions are to be made. The make_future_dataframe function takes the model object and a number of periods to forecast and produces a suitable dataframe. By default it will also include the historical dates so we can evaluate in-sample fit.  
+
+```{r}
+future <- make_future_dataframe(m, periods = 30)
+tail(future)
+```
+
+As with most modeling procedures in R, we use the generic predict function to get our forecast. The forecast object is a dataframe with a column yhat containing the forecast. It has additional columns for uncertainty intervals and seasonal components.  
+
+```{r}
+forecast <- predict(m, future)
+tail(forecast[c('ds', 'yhat', 'yhat_lower', 'yhat_upper')])
+```
+
+You can use the generic plot function to plot the forecast, by passing in the model and the forecast dataframe.  
+
+```{r}
+plot(m, forecast)
+```
+
+You can use the prophet_plot_components function to see the forecast broken down into trend, weekly seasonality, and yearly seasonality.  
+
+```{r}
+prophet_plot_components(m, forecast)
+```
+
+An interactive plot of the forecast using Dygraphs can be made with the command dyplot.prophet(m, forecast).  
+
+```{r}
+dyplot.prophet(m, forecast)
+```

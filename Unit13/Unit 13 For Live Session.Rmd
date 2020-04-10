@@ -193,8 +193,8 @@ plot(fore.mlp)
 ASE_SMU_NN = mean((SMU$IDSwipes[((CMRows-SMUForcast)+1):CMRows] - fore.mlp$mean)^2)
 ASE_SMU_NN
 
-#while (!is.null(dev.list()))  dev.off()
-#par(mfrow = c(2,1))
+while (!is.null(dev.list()))  dev.off()
+par(mfrow = c(2,1))
 
 #Plot
 plot(seq(1,CMRows,1), SMU$IDSwipes, type = "l",xlim = c(0,CMRows), ylab = "ID Swipes", main = paste(SMUForcast," Hour Turnstile Forecast"))

@@ -465,6 +465,8 @@ m = tswge::fore.aruma.wge(x,phi = es$phi,theta = es$theta,s=s,n.ahead = 48,lastn
 ase = ase(m$f,x)
 message("ASE is: ",ase)
 ase2=ase
+
+f=fore.aruma.wge(x, phi = c(1.195, 0.0297, 0.0842, 0.187, -1.169, .524, .076, .217, -.197, -.011,.023,-.033,.078,-.075,.0318), theta = c(.614, .302, .305, .624, -.993), s = 36, n.ahead = 48, plot = TRUE)
 ```
 
 Trying the forecasting package on the hourly data
@@ -475,16 +477,10 @@ IDSwipes <- read_csv("DedmanDailySwipe.csv")
 
 #Convert to a time series at 365 days
 #IDSwipes = ts(IDSwipes$IDSwipes, start = c(2019,2), frequency = 365)
-
 IDSwipes = ts(IDSwipes$IDSwipes)
 
-#Divide dataset into training and test set.  The last 36 months in the test set.
-IDSwipes1st = (IDSwipes[1:100])
-IDSwipes2nd = (IDSwipes[101:421])
-
-AnonDataTurnstile.f = auto.arima(IDSwipes, stepwise=FALSE, approximation=FALSE, stationary = FALSE, seasonal = TRUE, trace = FALSE,max.p = 13,max.q = 5,max.P = 13,max.Q = 5)
-
-f=fore.aruma.wge(x, phi = c(1.195, 0.0297, 0.0842, 0.187, -1.169, .524, .076, .217, -.197, -.011,.023,-.033,.078,-.075,.0318), theta = c(.614, .302, .305, .624, -.993), s = 36, n.ahead = 48, plot = TRUE)
+AnonDataTurnstile.f = auto.arima(IDSwipes)
+AnonDataTurnstile.f
 
 DayForcast=forecast::forecast(AnonDataTurnstile.f, h=7, level = 95)
 DayForcast
